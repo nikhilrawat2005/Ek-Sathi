@@ -1,0 +1,498 @@
+const fetch = require('node-fetch');
+const cheerio = require('cheerio');
+const net = require('net');
+const dns = require('dns').promises;
+
+/**
+ * Autonomous Web Crawler & Scraper Service
+ * Scrapes HTML, JavaScript snippets, CSS styles, metadata, links, and readable text from any URL
+ */
+
+// Blocks SSRF — no localhost, private, link-local, or CGNAT hosts.
+function isBlockedIp(ip) {
+  const v4 = ip.split('.').map(Number);
+  if (v4.length === 4 && v4.every(n => Number.isInteger(n))) {
+    if (v4[0] === 10) return true;                                   // 10.0.0.0/8
+    if (v4[0] === 127) return true;                                  // loopback
+    if (v4[0] === 0) return true;                                    // 0.0.0.0/8
+    if (v4[0] === 169 && v4[1] === 254) return true;                 // link-local
+    if (v4[0] === 172 && v4[1] >= 16 && v4[1] <= 31) return true;    // 172.16/12
+    if (v4[0] === 192 && v4[1] === 168) return true;                 // 192.168/16
+    if (v4[0] === 100 && v4[1] >= 64 && v4[1] <= 127) return true;   // CGNAT 100.64/10
+    return false;
+  }
+  const lower = ip.toLowerCase();
+  return lower === '::1' || lower === '::' || lower.startsWith('fc') || lower.startsWith('fd') || lower.startsWith('fe80:');
+}
+
+async function validatePublicUrl(targetUrl) {
+  let u;
+  try {
+    u = new URL(targetUrl);
+  } catch {
+    throw new Error('Invalid URL provided.');
+  }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+    throw new Error('Only http:// and https:// URLs are allowed.');
+  }
+  const host = u.hostname.toLowerCase();
+  if (host === 'localhost' || host.endsWith('.local') || host.endsWith('.internal')) {
+    throw new Error('Local/private hosts are not allowed.');
+  }
+  if (net.isIP(host)) {
+    if (isBlockedIp(host)) throw new Error('Private IP addresses are not allowed.');
+    return;
+  }
+  const addrs = await dns.lookup(host, { all: true });
+  for (const a of addrs) {
+    if (isBlockedIp(a.address)) throw new Error('URL resolves to a private address.');
+  }
+}
+
+/**
+ * Fetch with a hard AbortController timeout (kills the request completely).
+ * node-fetch's `timeout` option only covers initial connection, NOT full response.
+ */
+function fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const start = Date.now();
+  let ttfb = 0;
+  return fetch(url, { ...options, signal: controller.signal })
+    .then(async (res) => {
+      ttfb = Date.now() - start;
+      // Also abort if body takes too long — read text with a race
+      const bodyPromise = res.text();
+      const bodyTimer = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Body read timeout')), timeoutMs)
+      );
+      const text = await Promise.race([bodyPromise, bodyTimer]);
+      const loadMs = Date.now() - start;
+      clearTimeout(timer);
+      const rawHeaders = {};
+      if (res.headers && typeof res.headers.entries === 'function') {
+        for (const [k, v] of res.headers.entries()) rawHeaders[k.toLowerCase()] = v;
+      }
+      return {
+        ok: res.ok,
+        status: res.status,
+        statusText: res.statusText,
+        text,
+        headers: rawHeaders,
+        ttfb,
+        loadMs,
+        htmlBytes: Buffer.byteLength(text || '', 'utf8'),
+      };
+    })
+    .catch((err) => {
+      clearTimeout(timer);
+      if (err.name === 'AbortError') throw new Error(`Fetch timed out after ${timeoutMs}ms`);
+      throw err;
+    });
+}
+
+// ── Link quality filters ───────────────────────────────────
+// Returns true if this URL is worth keeping as a 'discovered profile link'.
+// The goal: only keep links that belong to the PERSON — their LinkedIn,
+// portfolio, deployed projects, social profiles, personal blog, etc.
+// Kills: platform nav, GitHub features/docs/blog, auth pages, CDN junk.
+
+const JUNK_DOMAINS = [
+  // GitHub's own site navigation (not the user's content)
+  /^https?:\/\/github\.com(?:\/features|\/security|\/pricing|\/marketplace|\/about|\/contact|\/explore|\/mcp|\/blog|\/docs|\/why-github|\/solutions|\/enterprise|\/team|\/collections|\/topics(?:\/|$)|\/resources(?:\/|$)|\/customer-stories|\/events|\/whitepapers|\/trust-center|\/partners|\/open-source(?:\/sponsors|\/accelerator|\/stories)?(?:\/|$)|\/trending(?:\/|$)|\/sponsors(?:\/|$)|\/readme|\/changelog|\/releases|\/discussions|\/codespaces|\/copilot|\/actions|\/packages|\/skills|\/issues|\/pulls|\/notifications|\/new|\/organizations|\/settings|\/stars(?:\/|$)|\/watching(?:\/|$)|\/saved-replies|\/showcases|\/guides)(.*)?$/i,
+  /^https?:\/\/(docs|cli|gist|education|classroom|status|desktop|mobile)\.github(\.(com|io))?/i,
+  /^https?:\/\/github\.blog/i,
+  /^https?:\/\/github\.com\/(?:site|account|orgs|apps|login|sessions|password_reset)\b/i,
+  // Search engines & tracking domains
+  /^https?:\/\/(www\.)?(bing\.com|google\.com|duckduckgo\.com|baidu\.com|yahoo\.com)\//i,
+  // Generic Q&A, dictionaries, baby names, generic forums & tech support junk
+  /zhihu\.com/i, /baidujingyan/i, /jingyan\.baidu/i, /momjunction\.com/i, /definitions\.net/i,
+  /avvo\.com/i, /technet\.microsoft\.com/i, /answers\.microsoft\.com/i, /ourhealthnetwork\.com/i,
+  /stelizabethphysicians\.com/i, /whatsapp\.com/i, /wa\.me/i, /lowyat\.net/i, /shopee\./i,
+  /forum\./i, /forums\./i, /wikipedia\.org/i,
+  // Generic platform nav / CDN / analytics
+  /^https?:\/\/(cdn|assets|static|tracker|analytics|ads|pixel|gtm|fonts)\.\S+/i,
+  // Boilerplate open-source / legal / policy pages
+  /\/(terms|privacy|cookie|legal|sitemap|robots\.txt)(\/?|$)/i,
+];
+
+const PROFILE_DOMAINS = [
+  /linkedin\.com\/in\//i,
+  /linkedin\.com\/pub\//i,
+  /twitter\.com\//i,
+  /x\.com\//i,
+  /instagram\.com\//i,
+  /youtube\.com\/(channel|c|user|@)/i,
+  /medium\.com\/@/i,
+  /dev\.to\//i,
+  /hashnode\.dev\//i,
+  /substack\.com\//i,
+  /kaggle\.com\/[^/]+\/?(datasets|competitions|notebooks)?$/i,
+  /leetcode\.com\/(u|users?)\//i,
+  /codeforces\.com\/profile\//i,
+  /codechef\.com\/users\//i,
+  /hackerrank\.com\/profile\//i,
+  /topcoder\.com\/members\//i,
+  /behance\.net\//i,
+  /dribbble\.com\//i,
+  /figma\.com\/(?:file|proto|design)\//i,
+  // Deployed project links (very high value)
+  /\.vercel\.app/i,
+  /\.netlify\.app/i,
+  /\.railway\.app/i,
+  /\.render\.com/i,
+  /\.heroku\.com/i,
+  /\.pages\.dev/i,
+  /\.web\.app/i,
+  /\.firebaseapp\.com/i,
+  /\.azurewebsites\.net/i,
+  /\.onrender\.com/i,
+  /\.fly\.dev/i,
+  /\.ngrok\.io/i,
+  // User's own GitHub repos/profile (not GitHub.com nav)
+  /github\.com\/[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)?$/i,
+  // npm, PyPI packages (could be the person's own)
+  /npmjs\.com\/package\//i,
+  /pypi\.org\/project\//i,
+];
+
+function isJunkUrl(url) {
+  const lower = String(url || '').toLowerCase();
+  // Always skip auth/redirect pages
+  if (/\/(login|signin|sign-in|auth|oauth|register|signup|sign-up|logout|callback)\b/.test(lower)) return true;
+  // Skip file anchors and empty fragments
+  if (/\.(png|jpg|jpeg|gif|svg|ico|webp|pdf|zip|gz|woff|woff2|ttf|mp4|mp3)$/i.test(lower)) return true;
+  // Skip known junk domains
+  for (const re of JUNK_DOMAINS) if (re.test(url)) return true;
+  return false;
+}
+
+function isHighValueProfileUrl(url) {
+  for (const re of PROFILE_DOMAINS) if (re.test(url)) return true;
+  return false;
+}
+
+/**
+ * Deep Hidden Data Extractor:
+ * Extracts hidden client-side state data from Next.js (__NEXT_DATA__),
+ * Nuxt (__NUXT_DATA__), JSON-LD schemas, and inline state variables.
+ */
+function extractHiddenState($, rawHtml) {
+  const hiddenData = {};
+
+  // 1. Next.js Hydration State (__NEXT_DATA__)
+  try {
+    const nextScript = $('script#__NEXT_DATA__').html();
+    if (nextScript) {
+      const parsed = JSON.parse(nextScript);
+      if (parsed && parsed.props && parsed.props.pageProps) {
+        hiddenData.nextData = parsed.props.pageProps;
+      }
+    }
+  } catch (e) { /* ignore */ }
+
+  // 2. Nuxt / Vue State (__NUXT_DATA__)
+  try {
+    const nuxtScript = $('script#__NUXT_DATA__').html();
+    if (nuxtScript) {
+      hiddenData.nuxtData = nuxtScript.slice(0, 3000);
+    }
+  } catch (e) { /* ignore */ }
+
+  // 3. JSON-LD Structured Data
+  const jsonLdBlocks = [];
+  const sameAsLinks = [];
+  $('script[type="application/ld+json"]').each((_, el) => {
+    try {
+      const text = $(el).html();
+      if (text) {
+        const json = JSON.parse(text);
+        jsonLdBlocks.push(json);
+        const sameAs = json.sameAs || (json['@graph'] && json['@graph'].map(g => g.sameAs).filter(Boolean));
+        if (Array.isArray(sameAs)) {
+          sameAs.forEach(sa => {
+            if (typeof sa === 'string' && sa.startsWith('http')) sameAsLinks.push(sa);
+          });
+        } else if (typeof sameAs === 'string' && sameAs.startsWith('http')) {
+          sameAsLinks.push(sameAs);
+        }
+      }
+    } catch (e) { /* ignore */ }
+  });
+  if (jsonLdBlocks.length) hiddenData.jsonLd = jsonLdBlocks;
+
+  // 4. Inline State regex fallback (window.__INITIAL_STATE__, window.__PRELOADED_STATE__)
+  if (!hiddenData.nextData && !hiddenData.jsonLd) {
+    const stateMatch = rawHtml.match(/window\.(?:__INITIAL_STATE__|__PRELOADED_STATE__|__DATA__)\s*=\s*(\{[\s\S]*?\});/);
+    if (stateMatch && stateMatch[1]) {
+      try {
+        hiddenData.inlineState = JSON.parse(stateMatch[1]);
+      } catch (e) { /* ignore */ }
+    }
+  }
+
+  return { hiddenData, sameAsLinks };
+}
+
+/**
+ * Architecture & Tech Stack Detector:
+ * Analyzes frameworks, styling libraries, bundlers, and hosting indicators.
+ */
+function inspectArchitecture($, rawHtml) {
+  const stack = {
+    framework: [],
+    styling: [],
+    libraries: [],
+    meta: {},
+  };
+
+  const html = rawHtml || '';
+
+  // Frameworks
+  if (html.includes('__NEXT_DATA__') || html.includes('/_next/')) stack.framework.push('Next.js (React)');
+  else if (html.includes('react-root') || html.includes('data-reactroot') || html.includes('react.production.min.js')) stack.framework.push('React');
+  if (html.includes('__NUXT__') || html.includes('__NUXT_DATA__') || html.includes('/_nuxt/')) stack.framework.push('Nuxt.js (Vue)');
+  else if (html.includes('data-v-') || html.includes('vue.global.js')) stack.framework.push('Vue.js');
+  if (html.includes('svelte-') || html.includes('/_app/immutable/')) stack.framework.push('Svelte / SvelteKit');
+  if (html.includes('ng-version') || html.includes('ng-app')) stack.framework.push('Angular');
+
+  // Styling & UI
+  if (html.includes('tailwindcss') || /class="[^"]*\b(flex|grid|p-\d|m-\d|text-slate|bg-slate|rounded-lg)\b[^"]*"/i.test(html)) {
+    stack.styling.push('Tailwind CSS');
+  }
+  if (html.includes('bootstrap') || html.includes('btn-primary')) stack.styling.push('Bootstrap');
+  if (html.includes('framer-motion') || html.includes('motion.div')) stack.libraries.push('Framer Motion (Animations)');
+  if (html.includes('three.js') || html.includes('three.min.js')) stack.libraries.push('Three.js (3D Graphics)');
+  if (html.includes('lucide') || html.includes('fontawesome')) stack.libraries.push('Vector Icon System');
+
+  return stack;
+}
+
+async function scrapeURL(targetUrl, options = {}) {
+  const timeoutMs = typeof options === 'number' ? options : (options.timeoutMs || 8000);
+  const wantsArchitecture = typeof options === 'object' && options.inspectArchitecture;
+
+  try {
+    if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+      targetUrl = 'https://' + targetUrl;
+    }
+
+    await validatePublicUrl(targetUrl);
+
+    const { ok, status, statusText, text: html } = await fetchWithTimeout(targetUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      },
+    }, timeoutMs);
+
+    if (!ok) {
+      throw new Error(`HTTP error ${status}: ${statusText}`);
+    }
+
+    const $ = cheerio.load(html);
+
+    // Extract metadata
+    const title = $('title').text().trim() || $('meta[property="og:title"]').attr('content') || $('meta[name="twitter:title"]').attr('content') || '';
+    const description = $('meta[name="description"]').attr('content') || $('meta[property="og:description"]').attr('content') || $('meta[name="twitter:description"]').attr('content') || '';
+
+    // 1. Extract Hidden Client-Side State Data (Next.js, JSON-LD, Nuxt)
+    const { hiddenData, sameAsLinks } = extractHiddenState($, html);
+
+    // 2. Tech Stack Inspection (if requested)
+    const architecture = wantsArchitecture ? inspectArchitecture($, html) : null;
+
+    // 3. Aggressive DOM Noise Stripping (Token Optimizer):
+    // Remove navigation menus, footers, headers, sidebars, cookie notices, modals, and ads
+    $(
+      'script, style, noscript, svg, iframe, nav, footer, header, ' +
+      'aside, .sidebar, [role="banner"], [role="navigation"], [role="complementary"], ' +
+      '.cookie, .cookie-banner, .cookie-notice, .ad, .ad-container, .advertisement, ' +
+      '.footer-links, .menu, .nav-menu, .navbar, .social-share, .popup, .modal'
+    ).remove();
+
+    // Prioritize main readable content containers (<article>, <main>, .content) if available
+    let readableText = '';
+    const mainEl = $('main, article, [role="main"], #content, .content, .post-content, .article-body');
+    if (mainEl.length > 0) {
+      readableText = mainEl.text().replace(/\s+/g, ' ').trim();
+    }
+    
+    // Fallback to cleaned body if main container is too small or missing
+    if (!readableText || readableText.length < 150) {
+      readableText = $('body').text().replace(/\s+/g, ' ').trim();
+    }
+
+    const cleanText = readableText;
+
+    // Extract page headings (H1, H2, H3)
+    const headings = [];
+    $('h1, h2, h3').each((_, el) => {
+      const text = $(el).text().trim();
+      if (text && text.length > 3) headings.push(`${el.tagName.toUpperCase()}: ${text}`);
+    });
+
+
+    // Extract outgoing links
+    const highValueLinks = [];
+    const otherLinks = [];
+    const seenLinks = new Set();
+
+    sameAsLinks.forEach(sa => {
+      if (!seenLinks.has(sa) && !isJunkUrl(sa)) {
+        seenLinks.add(sa);
+        highValueLinks.push({ url: sa, text: 'JSON-LD Verified Profile' });
+      }
+    });
+
+    $('a[href]').each((_, el) => {
+      const rawHref = $(el).attr('href');
+      if (!rawHref) return;
+      try {
+        const parsedUrl = new URL(rawHref, targetUrl);
+        if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') return;
+        const href = parsedUrl.href.split('#')[0];
+        if (seenLinks.has(href) || isJunkUrl(href)) return;
+        seenLinks.add(href);
+
+        const linkText = $(el).text().trim().replace(/\s+/g, ' ').slice(0, 100);
+        const entry = { url: href, text: linkText || parsedUrl.hostname };
+        if (isHighValueProfileUrl(href)) {
+          highValueLinks.push(entry);
+        } else {
+          otherLinks.push(entry);
+        }
+      } catch (e) { /* ignore invalid URLs */ }
+    });
+    const links = [];
+    links.push(...highValueLinks);
+    for (const l of otherLinks) {
+      if (links.length >= 30) break;
+      links.push(l);
+    }
+
+    return {
+      url: targetUrl,
+      title,
+      description,
+      headings,
+      jsonLd: hiddenData.jsonLd || [],
+      hiddenData,
+      architecture,
+      links,
+      contentSnippet: cleanText.slice(0, 4500),
+      fullTextLength: cleanText.length,
+    };
+  } catch (err) {
+    console.error(`scrapeURL error for ${targetUrl}:`, err.message);
+    throw err;
+  }
+}
+
+
+// ── Deep-crawl helper ─────────────────────────────────────
+function extractLinks($, baseUrl, maxLinks) {
+  const links = [];
+  const seen = new Set();
+  try { baseUrl = new URL(baseUrl); } catch { return links; }
+  $('a[href]').each((_, el) => {
+    if (links.length >= maxLinks) return false;
+    const raw = $(el).attr('href');
+    if (!raw) return;
+    try {
+      const u = new URL(raw, baseUrl.origin);
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') return;
+      const href = u.href.split('#')[0];
+      if (seen.has(href)) return;
+      // Skip login/register/auth pages
+      if (isUselessUrl(href)) return;
+      seen.add(href);
+      const text = $(el).text().trim().replace(/\s+/g, ' ').slice(0, 120);
+      if (!text) return;
+      links.push({ url: href, text });
+    } catch { /* ignore bad links */ }
+  });
+  return links;
+}
+
+// Extract hackathon-style metadata: dates, prizes, deadlines, statuses
+function extractEventMeta(html) {
+  const text = String(html || '')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .slice(0, 25000);
+
+  const dates = [];
+  // Flexible regex for dates, date-ranges (e.g. 7-9 August 2026, 6th Aug 2026, 2026-08-06, Deadline: 6 August)
+  const dateRe = /(\d{1,2}(?:\s*[-–—to\s]+\s*\d{1,2})?\s*(?:st|nd|rd|th)?\s+(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[,\s]*\d{2,4}|\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{2,4})/gi;
+  let m;
+  while ((m = dateRe.exec(text)) !== null && dates.length < 8) {
+    const d = (m[1] || m[0] || '').trim();
+    if (d && !dates.some(x => String(x || '').toLowerCase() === d.toLowerCase())) dates.push(d);
+  }
+
+  const prize = [];
+  const prizeRe = /(?:prize|prizes? pool|cash (?:prize|award)|rewards?|prize money)[:\s]+(?:up to\s+)?(?:₹|Rs\.?|INR|USD|\$)\s?[\d,]+(?:\s*[kK]|\s*lakh|\s*crore)?/gi;
+  while ((m = prizeRe.exec(text)) !== null && prize.length < 5) {
+    prize.push(m[0].slice(0, 120));
+  }
+
+  const modeMatch = text.match(/(?:fully\s+)?(online|virtual|remote|offline|on[- ]site|in[- ]person)/i);
+  const mode = modeMatch && modeMatch[1] ? modeMatch[1].toLowerCase() : 'unknown';
+
+  return { dates, prize, mode };
+}
+
+/**
+ * Deep-crawl a page: scrape the main URL only (no sub-pages for speed).
+ * Sub-page crawling removed to stay within Vercel serverless time limits.
+ */
+async function deepCrawl(targetUrl, { maxLinks = 2, sameDomain = true } = {}) {
+  const main = await scrapeURL(targetUrl, 10000);
+
+  // Collect links from already-fetched content (no extra fetch)
+  let links = [];
+  try {
+    const $ = cheerio.load(main.contentSnippet || '');
+    // We already have the parsed page — just extract links from headings/content
+    // But we need the raw HTML for link extraction; re-fetch is expensive.
+    // Instead, just return the main URL as the only link.
+    links = [targetUrl];
+  } catch { /* ignore */ }
+
+  return {
+    main,
+    links: links.slice(0, maxLinks),
+    subPages: [],      // No sub-page crawling — keeps it fast
+    scrapedCount: 0,
+  };
+}
+
+/**
+ * Scrape a batch of URLs in parallel and merge readable text.
+ */
+async function scrapeAll(urls, { maxSnippets = 4000 } = {}) {
+  const list = (urls || []).slice(0, 6);
+  const results = await Promise.allSettled(list.map(u => scrapeURL(u)));
+  const ok = results.filter(r => r.status === 'fulfilled').map(r => r.value);
+  const combined = ok.map(p => `${p.title}\n${p.description}\n${p.contentSnippet}`).join('\n\n---\n\n');
+  return {
+    scraped: ok.length,
+    failed: results.length - ok.length,
+    pages: ok.map(p => ({ url: p.url, title: p.title })),
+    combinedText: combined.slice(0, maxSnippets),
+  };
+}
+
+module.exports = {
+  scrapeURL,
+  deepCrawl,
+  scrapeAll,
+  extractEventMeta,
+  isHighValueProfileUrl,
+  isJunkUrl,
+  validatePublicUrl,
+  fetchWithTimeout,
+};

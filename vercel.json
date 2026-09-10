@@ -1,0 +1,31 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "src/server.js",
+      "use": "@vercel/node",
+      "config": { "maxLambdaSize": "50mb" }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/app.js",
+      "headers": { "Cache-Control": "no-cache, no-store, must-revalidate" },
+      "dest": "/src/server.js"
+    },
+    {
+      "src": "/style.css",
+      "headers": { "Cache-Control": "no-cache, no-store, must-revalidate" },
+      "dest": "/src/server.js"
+    },
+    {
+      "src": "/index.html",
+      "headers": { "Cache-Control": "no-cache, no-store, must-revalidate" },
+      "dest": "/src/server.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/src/server.js"
+    }
+  ]
+}

@@ -1,0 +1,220 @@
+
+
+LEARN   •     BUI  LD   •     GROW
+2026–27
+Y O U R   A I   C O MP A N I O N   F O R
+L E A R N I N G   &   G R O WT H
+EK SATHI
+AI
+A I - P O WE R E D   S T U D E N T   C O MP A N I O N
+GROUP LEADER
+N I K H I L   R A WA T
+TEAM MEMBERS
+N I K H I L   D E V   S I N G H
+N I S H A N T   N A G A R
+P A R T H   S I N G H
+GUIDE
+MS .   B A B L I   K U MA R I
+D E P A R T ME N T   O F   C O MP U T E R
+S C I E N C E   &   E N G I N E E R I N G
+A B E S   E N G I N E E R I N G   C O L L E G E
+
+ K E Y   P R OB L E MS   I N  S UMMA R Y :
+Problem
+Statement
+Students today rely on multiple platforms for learning, project
+development, career planning, opportunities and technical
+updates. These activities are scattered across different tools
+and websites, making the overall student journey fragmented
+and difficult to manage.
+Learning, projects and career activities are handled across
+multiple platforms
+General AI assistants lack continuous student-specific context
+and personalization
+GitHub repositories, websites, internships and hackathons
+require separate searching and understanding
+Useful technology updates are scattered across different
+sources
+Students need a single platform that connects learning,
+building, career and opportunities
+
+Motivation &
+Objectives
+Students use multiple disconnected
+platforms for learning, projects and career
+growth.
+Useful resources are available, but are not
+connected to the student's personal goals.
+Existing AI assistants provide general help
+but limited student-specific continuity.
+We want to build one AI companion that
+stays relevant to the student's journey.
+The project also gives us an opportunity to
+combine AI + Cloud + APIs + Data +
+Personalization in one system.
+MOTIVATION
+OBJECTIVES
+Develop a cloud-based AI student companion.
+Provide personalized assistance through a
+central AI chat.
+Support projects and hackathon preparation.
+Enable GitHub & Website Study through AI-
+based analysis.
+Provide resume analysis and personalized
+career roadmaps.
+Discover relevant internships and
+hackathons.
+Deliver useful technology news and
+personalized updates.
+Maintain relevant student memory and
+preferences.
+O N E   P L A T F O R M.   O N E   C O N T E X T.   O N E   A I
+C O MP A N I O N   F O R   T H E   S T U D E N T   J O U R N E Y.
+
+Our
+Solution
+02
+05
+03
+06
+ONE AI COMPANION FOR THE
+COMPLETE STUDENT JOURNEY
+EK SATHI
+AI-POWERED STUDENT COMPANION
+Plan projects and
+prepare smarter for
+hackathons.
+01
+04
+PROJECT &
+HACKATHON LAB
+Decode real projects
+and websites to
+learn how they work.
+GITHUB & WEBSITE
+STUDY
+Analyze your resume
+and build a
+personalized career
+roadmap.
+CAREER & RESUME
+Discover relevant
+internships,
+hackathons and
+opportunities.
+OPPORTUNITY
+FINDER
+TECH NEWSMY MEMORY
+Stay updated with
+useful technology
+news and insights.
+Remember your
+goals, preferences
+and important
+personal context.
+
+How Ek Sathi Works
+The student provides a
+question, document,
+GitHub repository,
+website or other
+resource.
+U S E R   I N P U TC O N T E X T  &   P R O C E S S I N GA I   &   C LO U D   S E R V I C E S
+FROM USER INPUT TO PERSONALIZED AI ASSISTANCE
+ONE INTELLIGENT WORKFLOW CONNECTING AI, CLOUD SERVICES AND STUDENT CONTEXT.
+P E R S O N A L I Z E D   R E S P O N S E
+A S K   •   U P LO A D   •
+D I S C U S S   •   S H A R E
+The request is
+processed and relevant
+user profile, memory
+and feature-specific
+context are collected.
+N E X T. J S   +   F A S TA P I
+The LLM processes the
+request using relevant
+data from cloud
+services and external
+APIs.
+OP E N R OU T E R   +   A P I S   +
+D ATA B A S E   +   S T OR A G E
+Ek Sathi uses the
+processed context to
+provide a relevant and
+personalized response,
+analysis or
+recommendation.
+U N D E R S TA N D   •
+G E N E R AT E   •   A S S I S T
+U S E R   →  C ON T E X T  &  P R OC E S S I N G   →  A I   +   C LOU D   →  P E R S ON A L I Z E D   R E S P ON S E
+
+Next.js + React + TypeScript
+Web interface for chat, dashboard and feature modules.
+Deployment: Vercel
+F RO N T E N D
+FastAPI + Python
+Handles APIs, business logic, AI requests and external service integration.
+BAC K E N D
+OpenRouter + LLMs
+Provides conversational AI, analysis, summarization and personalized assistance.
+A I   L AY E R
+Firebase + Supabase
+Firebase manages authentication, while Supabase stores structured application
+data.
+DATA  & AU T H E N T I CAT I O N
+GitHub API + News/Opportunity Sources + Memory API
+Provides repository data, technology updates, opportunities and personalized
+user context.
+E XT E R N A L S E RV I C ES
+Cloudinary
+Manages uploaded files and supported media resources.
+STO RAG E
+Technology
+Stack & Cloud
+Architecture
+A CLOUD-BASED ARCHITECTURE CONNECTING
+AI, DATA & EXTERNAL SERVICES
+
+Expected Outcomes
+FROM AN AI ASSISTANT TO A COMPLETE STUDENT COMPANION
+PERSONALIZED AI
+ASSISTANCE
+Context-aware support based
+on the student's goals,
+preferences and memory.
+CAREER & OPPORTUNITY
+GUIDANCE
+Resume analysis, career
+roadmaps and relevant
+internship/hackathon
+discovery.
+UNIFIED STUDENT
+PLATFORM
+Learning, projects, career,
+opportunities and technical
+updates in one place.
+TECHNICAL KNOWLEDGE
+HUB
+AI-processed technology
+news with the ability to
+discuss selected topics
+further.
+01
+04
+02
+05
+SMART PROJECT & LEARNING
+SUPPORT
+AI-assisted project
+development, hackathon
+preparation and technical
+study.
+CLOUD-BASED AI ECOSYSTEM
+Integrated AI, authentication,
+database, storage and external
+services in a scalable web
+platform.
+03
+06
+A SINGLE PLATFORM DESIGNED TO HELP STUDENTS LEARN, BUILD, PREPARE AND GROW.
+
