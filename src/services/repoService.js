@@ -10,10 +10,16 @@ const RAW = 'https://raw.githubusercontent.com';
 const CACHE_TTL = 30 * 60 * 1000; // 30 min
 const cache = new Map();
 
-const MAX_FILES = 30;        // max files to actually read
-const MAX_TOTAL_BYTES = 150 * 1024; // 150 KB of file content total
+const MAX_FILES = 40;        // max files to actually read
+const MAX_TOTAL_BYTES = 70 * 1024; // 70 KB of file content total per repo read
 const MAX_FILE_BYTES = 120 * 1024;  // single file cap
 const MAX_DISPLAY_FILE = 4500;      // chars shown per file in context
+
+// Profile deep-scan limits (user requested a generous scraping budget)
+const PROFILE_NODE_CHARS = 70000;   // combined repo README/content budget for LLM (~70000)
+const PROFILE_REPO_CAP = 100;       // max repos scraped per profile
+const PROFILE_SUMMARY_TOP = 25;     // repos that get a README summary card
+const PROFILE_CACHE_TTL = 15 * 60 * 1000;
 
 const SKIP_DIRS = ['node_modules', '.git', '.next', '.nuxt', 'dist', 'build', 'out', 'vendor', 'coverage', '.cache', 'public/build', '__pycache__', '.venv', 'venv', 'target', '.github/workflows'];
 const SKIP_FILES = ['package-lock.json', 'yarn.lock', 'pnpm-lock.yaml', 'bun.lock', 'composer.lock', 'poetry.lock', 'Cargo.lock', 'Gemfile.lock', 'go.sum'];
@@ -33,7 +39,8 @@ function fetchGH(path, timeoutMs = 12000) {
     .then(async (res) => {
       clearTimeout(t);
       const body = await res.json().catch(() => ({}));
-      return { status: res.status, body };
+      const link = res.headers.get('link') || '';
+      return { status: res.status, body, link };
     })
     .catch((err) => {
       clearTimeout(t);
@@ -279,9 +286,7 @@ async function searchRepos(query, limit = 5) {
   return { items, count: items.length };
 }
 
-module.exports = { extractRepoUrls, analyzeRepo, getRepoInfo, searchRepos, getUserProfile, listUserRepos, answerRepoQuestion };
-
-// ─────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════
 // Deterministic Q&A on the analyzed repo — works with ZERO
 // LLM keys. We search the files Ek Sathi actually read for
 // keyword hits and answer the question from real code.
@@ -558,3 +563,262 @@ async function listUserRepos(usernameInput, limit = 30) {
   }));
   return { repos, count: repos.length };
 }
+
+// ═══════════════════════════════════════════════════════════
+// PROFILE DEEP-SCAN — GitHub person → combined overview + per-repo cards
+// "All repos that person has, combined into one explanation box,
+//  then one card per repo with stars + commits + README summary."
+// ═══════════════════════════════════════════════════════════
+
+function parseLastPageFromLink(link) {
+  const m = /[?&]page=(\d+)[^>]*>;\s*rel="last"/.exec(link || '');
+  return m ? parseInt(m[1], 10) : 0;
+}
+
+// Total commit count for a repo via the Link header of /commits?per_page=1
+async function getCommitCount(owner, repo) {
+  const { status, body, link } = await fetchGH(`/repos/${owner}/${repo}/commits?per_page=1`, 15000);
+  if (status !== 200) return null;
+  const last = parseLastPageFromLink(link);
+  if (last > 0) return last;
+  return Array.isArray(body) ? body.length : 0;
+}
+
+// Full README of a repo via the contents API (auto-detects name, base64)
+async function fetchReadmeText(owner, repo) {
+  const { status, body } = await fetchGH(`/repos/${owner}/${repo}/readme`, 15000);
+  if (status !== 200 || !body || !body.content) return '';
+  try {
+    return Buffer.from(body.content, 'base64').toString('utf8');
+  } catch (e) {
+    return '';
+  }
+}
+
+const profileCache = new Map();
+
+/**
+ * getUserProfileFull(username) →
+ * { status:'ok', profile, overview, repos[{.., commits, summary}], stats, meta }
+ * Scrapes ALL public repos of the person (paginated), fetches commit counts,
+ * reads READMEs (up to PROFILE_NODE_CHARS total ≈ 70000), then one LLM call
+ * produces the combined overview + a short summary per repo.
+ */
+async function getUserProfileFull(usernameInput, opts = {}) {
+  const username = cleanUsername(usernameInput);
+  if (!username) return { error: 'empty_username', message: 'Username / GitHub profile link required.' };
+
+  const cacheKey = username;
+  const cached = profileCache.get(cacheKey);
+  if (cached && Date.now() - cached.ts < PROFILE_CACHE_TTL) return cached.data;
+
+  const profile = await getUserProfile(username);
+  if (profile.error) return profile;
+
+  // 1) Fetch ALL public repos (paginated, up to 10 pages)
+  const allRepos = [];
+  const perPage = 100;
+  const cap = Math.min(Math.max(parseInt(opts.capRepos) || PROFILE_REPO_CAP, 1), 200);
+  let page = 1;
+  while (page <= 10) {
+    const { status, body, link } = await fetchGH(`/users/${username}/repos?sort=updated&per_page=${perPage}&page=${page}`, 20000);
+    if (status === 403) {
+      if (!allRepos.length) return { error: 'rate_limit', message: 'GitHub API rate limit hit. Thodi der baad try karo ya .env me GITHUB_TOKEN laga do (60/hr anonymous → 5000/hr).' };
+      break;
+    }
+    if (status !== 200 || !Array.isArray(body) || body.length === 0) break;
+    allRepos.push(...body);
+    const last = parseLastPageFromLink(link);
+    if (last <= page) break;
+    page++;
+  }
+
+  const repos = allRepos.slice(0, cap).map(r => ({
+    name: r.name,
+    full_name: r.full_name,
+    html_url: r.html_url,
+    description: r.description || '',
+    language: r.language || 'n/a',
+    stars: r.stargazers_count ?? 0,
+    forks: r.forks_count ?? 0,
+    fork: !!r.fork,
+    updated_at: r.updated_at,
+    default_branch: r.default_branch || 'main',
+  }));
+  const topSorted = [...repos].sort((a, b) => b.stars - a.stars);
+
+  // 2) Commit counts — best effort for every scraped repo (break on rate limit)
+  let rateLimited = false;
+  for (const r of topSorted) {
+    if (rateLimited) break;
+    const c = await getCommitCount(username, r.name);
+    if (c === null) rateLimited = true;
+    else r.commits = c;
+  }
+
+  // 3) READMEs — top repos by stars, aggregated up to ~70000 chars
+  let contentBudget = 0;
+  const readmes = [];
+  for (const r of topSorted) {
+    if (contentBudget >= PROFILE_NODE_CHARS) break;
+    const text = await fetchReadmeText(username, r.name);
+    if (text) {
+      readmes.push({ repo: r.full_name, stars: r.stars, text });
+      contentBudget += text.length;
+    }
+  }
+
+  // 4) One LLM call: combined overview + per-repo README summaries
+  let overview = '';
+  const repoSummaries = new Map();
+  try {
+    const llm = require('./llmService');
+    const repoList = topSorted.map((r, i) => `${i + 1}. "${r.full_name}"${r.description ? ' — ' + r.description.slice(0, 140) : ''} | ${r.language} | ⭐${r.stars}`).join('\n');
+    const readmeBlock = readmes
+      .map((rm, i) => `◆ ${i + 1}. [${rm.repo}] (⭐${rm.stars})\n${rm.text.slice(0, 12000)}`)
+      .join('\n\n---\n\n');
+
+    const res = await llm.callLLM({
+      role: 'review',
+      messages: [
+        {
+          role: 'system',
+          content: `You are Ek Sathi, a GitHub profile analyst. You just deep-scraped a developer's GitHub profile. Reply ONLY clean JSON (no fences, no backticks).
+Return EXACTLY this shape:
+{
+  "overview": "3-5 punchy sentences: overall what this developer builds, main themes + tech skills, work personality — combine profile bio + repo names/descriptions + READMEs.",
+  "repos": [
+    { "id": "owner/repo", "summary": "2 short sentences: what the repo does + the tech stack used (base on README if present, else name/description)" }
+  ]
+}
+Rules:
+- "id" MUST exactly match one of the repo names below.
+- Only include repos listed below. Include EVERY repo.
+- If a repo has no README, write summary from its name/description.`,
+        },
+        {
+          role: 'user',
+          content: `USER: ${profile.name || username}
+BIO: ${profile.bio || 'no bio'}
+LOCATION: ${profile.location || 'n/a'}
+FOLLOWERS: ${profile.followers}
+
+REPOS (${topSorted.length}):
+${repoList}
+
+README CONTENT (top ${readmes.length} repos by stars, budget ~${PROFILE_NODE_CHARS} chars):
+${readmeBlock || 'No READMEs were retrievable — summarize from names/descriptions only.'}`,
+        },
+      ],
+      temperature: 0.3,
+      max_tokens: 2000,
+    });
+
+    const raw = res.text.replace(/```json|```/g, '').trim();
+    const parsed = JSON.parse(raw);
+    overview = String(parsed.overview || '').trim();
+    if (Array.isArray(parsed.repos)) {
+      parsed.repos.forEach(rp => {
+        if (rp && rp.id && rp.summary) repoSummaries.set(String(rp.id).trim(), String(rp.summary).trim());
+      });
+    }
+  } catch (e) {
+    console.warn('[RepoService] Profile overview LLM failed:', e.message);
+  }
+
+  if (!overview) {
+    overview = `${profile.name || username} is a GitHub developer with ${repos.length} public repo${repos.length === 1 ? '' : 's'} (${topSorted.filter(r => r.stars > 0).length} starred). Open GitHub profile for the full history.`;
+  }
+
+  // 5) Final robots
+  const finalRepos = topSorted.map(r => ({
+    name: r.name,
+    full_name: r.full_name,
+    html_url: r.html_url,
+    description: r.description,
+    language: r.language,
+    stars: r.stars,
+    forks: r.forks,
+    commits: r.commits !== undefined ? r.commits : null,
+    updated_at: r.updated_at,
+    summary: repoSummaries.get(r.full_name) || (r.description ? r.description.slice(0, 240) : 'No README / description available.'),
+  }));
+
+  // 6) Aggregate stats
+  const langCount = {};
+  repos.forEach(r => { if (r.language && r.language !== 'n/a') langCount[r.language] = (langCount[r.language] || 0) + 1; });
+  const topLanguages = Object.entries(langCount).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([l, n]) => `${l}×${n}`).join(', ');
+
+  const result = {
+    status: 'ok',
+    profile: {
+      login: profile.login,
+      name: profile.name,
+      bio: profile.bio,
+      location: profile.location,
+      avatar_url: profile.avatar_url,
+      html_url: profile.html_url,
+      publicRepos: profile.public_repos,
+      followers: profile.followers,
+      following: profile.following,
+      created_at: profile.created_at,
+      blog: profile.blog,
+      company: profile.company,
+    },
+    overview,
+    repos: finalRepos,
+    stats: {
+      totalRepos: repos.length,
+      totalStars: repos.reduce((s, r) => s + r.stars, 0),
+      totalForks: repos.reduce((s, r) => s + r.forks, 0),
+      topLanguages,
+      readmesSummarized: readmes.length,
+      contentChars: contentBudget,
+    },
+    meta: { scrapedAt: new Date().toISOString(), auth: GITHUB_TOKEN ? 'token' : 'anonymous' },
+  };
+
+  profileCache.set(cacheKey, { ts: Date.now(), data: result });
+  return result;
+}
+
+/**
+ * explainRepo(analysis) — LLM narrative for the pop-out repo card.
+ * Uses the deep analysis from analyzeRepo() (files + README actually read).
+ */
+async function explainRepo(analysis) {
+  if (!analysis || analysis.status !== 'ok') {
+    return { status: 'error', message: (analysis && analysis.message) || 'Repo analyze nahi hua.' };
+  }
+  try {
+    const llm = require('./llmService');
+    const res = await llm.callLLM({
+      role: 'review',
+      messages: [
+        {
+          role: 'system',
+          content: `You are Ek Sathi, a friendly GitHub repo explainer. Your job: take the deep repo analysis below and write a clear, structured markdown explanation of the repo. Base EVERYTHING only on the data given — NEVER invent features, files, or commands that are not present.
+Structure:
+## 💡 Idea & Purpose — what the project is, what problem it solves
+## ⚙️ How It Works — architecture flow in plain words (no code dumps)
+## 🧰 Tech Stack — languages, frameworks, dependencies (explicit list from data)
+## 📂 Key Files — the actual files read and what each does (markdown list, 1 line each, only real files)
+## 🚀 Setup / Run — only if README or package scripts show it (exact commands from data)
+Be concise and practical. Hinglish light is fine.`,
+        },
+        {
+          role: 'user',
+          content: analysis.context || JSON.stringify(analysis).slice(0, 4000),
+        },
+      ],
+      temperature: 0.3,
+      max_tokens: 1200,
+    });
+    return { status: 'ok', explanation: res.text.trim(), repo: analysis.repo, readCount: analysis.readCount || 0 };
+  } catch (e) {
+    console.warn('[RepoService] explainRepo failed:', e.message);
+    return { status: 'error', message: 'Explanation LLM failed: ' + e.message };
+  }
+}
+
+module.exports = { extractRepoUrls, analyzeRepo, getRepoInfo, searchRepos, getUserProfileFull, explainRepo, getUserProfile, listUserRepos, answerRepoQuestion };

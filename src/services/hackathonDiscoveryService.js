@@ -513,7 +513,7 @@ async function llmFilterCse(items) {
       messages: [
         {
           role: 'system',
-          content: `You are a hackathon relevance classifier for a Computer Science student (Nikhil, B.Tech CSE).
+          content: `You are a hackathon relevance classifier for a Computer Science/IT student.
 INCLUDE only hackathons related to: Web Development, AI/ML, Automation, DSA/Algorithms, Mobile App Dev, Software Engineering, Open Source, Cloud Computing.
 EXCLUDE: Electrical, Mechanical, Civil, Networking infra, Hardware/Robotics, Cybersecurity CTF, Finance-only, Marketing-only challenges.
 Reply with ONLY a JSON array of numbers representing the indices (1-based) of hackathons that SHOULD BE INCLUDED. Example: [1,3,5]`,

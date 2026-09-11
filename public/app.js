@@ -417,41 +417,157 @@ function renderDiscoverGrid() {
   }));
 }
 
-/* ── Study: GitHub ─────────────────────────────────────── */
-async function analyzeGitHub() {
-  const input = $('github-input').value.trim();
-  if (!input) return;
+/* ── Study: GitHub Profile (deep scan) ───────────────── */
+async function analyzeGithubProfile() {
+  const raw = $('github-input').value.trim();
+  if (!raw) return;
   const res = $('github-results');
-  const isUrl = /^https?:\/\//i.test(input);
-  res.innerHTML = '<div class="empty-msg">⏳ GitHub repo analyze ho raha hai…</div>';
+
+  let username = '';
+  const urlMatch = raw.match(/github\.com\/([A-Za-z0-9_.-]+)/i);
+  if (urlMatch) username = urlMatch[1];
+  else if (/^[A-Za-z0-9_.-]+$/.test(raw) && raw.length <= 80) username = raw;
+  else { res.innerHTML = '<div class="empty-msg">⚠️ Invalid input — use https://github.com/username or just a GitHub username.</div>'; return; }
+
+  res.innerHTML = '<div class="empty-msg">⏳ GitHub profile scrape ho raha hai — sab public repos scan ho rahe hain (≈30s)…</div>';
+  $('github-qa').style.display = 'none';
   try {
-    const data = await apiFetch('/api/study/github', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: isUrl ? input : undefined, text: isUrl ? undefined : input }) });
-    if (data.status !== 'ok') {
-      res.innerHTML = `<div class="empty-msg">⚠️ ${escHtml(data.message || 'Analyze nahi ho paya')}</div>`;
-      return;
-    }
-    const repo = data.repo || {};
-    res.innerHTML = `
-      <div class="repo-card">
-        <div class="repo-card-head">
-          <h3>📦 ${escHtml(repo.fullName || '')}</h3>
-          <a class="btn-small" href="${escHtml(repo.fullName ? 'https://github.com/' + repo.fullName : '#')}" target="_blank" rel="noopener">Open on GitHub ↗</a>
-        </div>
-        <p class="ws-item-sub">${escHtml(repo.description || '')}</p>
-        <div class="repo-stats">
-          <span>⭐ ${repo.stars ?? 0}</span><span>⑂ ${repo.forks ?? 0}</span>
-          <span>🧬 ${escHtml(repo.language || 'n/a')}</span>
-          <span>🔧 ${escHtml(repo.defaultBranch || 'main')}</span>
-        </div>
-        ${data.stats ? `<p class="ws-item-sub">📁 ${escHtml(data.stats.fileCount || '0')} files · top dirs: ${escHtml(data.stats.topDirs || 'n/a')} · top ext: ${escHtml(data.stats.topExt || 'n/a')}</p>` : ''}
-        ${data.readCount ? `<p class="ws-item-sub">📖 Read ${data.readCount} key files${data.truncated ? ' (tree truncated)' : ''}</p>` : ''}
-      </div>`;
-    $('github-qa').style.display = 'flex';
-    $('github-repo-name').textContent = repo.fullName || '';
-    $('github-repo-desc').textContent = repo.description || '';
-    $('github-messages').innerHTML = '';
+    const data = await apiFetch(`/api/study/github/profile?username=${encodeURIComponent(username)}`);
+    if (data.error) { res.innerHTML = `<div class="empty-msg">⚠️ ${escHtml(data.message || data.error)}</div>`; return; }
+    window._ghProfile = data;
+    renderGithubProfile(data);
   } catch (err) {
     res.innerHTML = `<div class="empty-msg">⚠️ ${escHtml(err.message)}</div>`;
+  }
+}
+
+function renderGithubProfile(data) {
+  const res = $('github-results');
+  const p = data.profile || {};
+  const s = data.stats || {};
+  const repos = data.repos || [];
+
+  const LANG_CLR = { JavaScript:'#f1e05a', TypeScript:'#3178c6', Python:'#3572a5', Java:'#b07219', Go:'#00ADD8', Rust:'#dea584', C:'#555555', 'C++':'#f34b7d', Ruby:'#701516', PHP:'#4F5D95', Swift:'#F05138', Kotlin:'#A97BFF', HTML:'#e34c26', CSS:'#563d7c', Dart:'#00B4AB', Shell:'#89e051', Vue:'#41b883', Svelte:'#ff3e00', Jupyter:'#DA5B0B' };
+
+  const profileHtml = `
+    <div class="gh-profile-overview">
+      <div class="gh-profile-top">
+        ${p.avatar_url ? `<img class="gh-avatar" src="${escHtml(p.avatar_url)}" alt="">` : ''}
+        <div class="gh-profile-info">
+          <h3 style="margin:0">${escHtml(p.name || p.login || '')}</h3>
+          <p class="gh-bio" style="margin:4px 0 0;font-size:12px;color:var(--text2)">
+            @${escHtml(p.login || '')}${p.location ? ' · ' + escHtml(p.location) : ''}${p.company ? ' · ' + escHtml(p.company) : ''}
+            ${p.blog ? ` · <a href="${escHtml(p.blog)}" target="_blank" rel="noopener" style="color:var(--accent)">website</a>` : ''}
+          </p>
+          ${p.bio ? `<p class="ws-item-sub" style="margin-top:6px;font-style:italic">${escHtml(p.bio)}</p>` : ''}
+          <div class="gh-stats-row">
+            <span>📦 ${s.totalRepos ?? repos.length} repos</span>
+            <span>⭐ ${s.totalStars ?? 0} stars</span>
+            <span>⑂ ${s.totalForks ?? 0} forks</span>
+            <span>👥 ${p.followers ?? 0} followers</span>
+            ${s.topLanguages ? `<span>🧬 ${escHtml(s.topLanguages)}</span>` : ''}
+          </div>
+        </div>
+      </div>
+      ${data.overview ? `<div class="gh-overview-text">${mdToHtml(data.overview)}</div>` : ''}
+      <p class="ws-item-sub" style="margin-top:8px;font-size:11px;opacity:0.7">
+        Scraped ${s.readmesSummarized ?? 0} READMEs · ${(s.contentChars ?? 0).toLocaleString()} chars
+        ${data.meta?.auth === 'token' ? ' · 🔑 authenticated' : ' · anonymous'}
+      </p>
+    </div>`;
+
+  let cardsHtml = '<div class="gh-repo-grid">';
+  repos.forEach(r => {
+    const color = LANG_CLR[r.language] || '#8b8b8b';
+    cardsHtml += `
+      <div class="gh-repo-card" onclick="openRepoModal('${escHtml(r.full_name).replace(/'/g, "\\'")}')">
+        <div class="gh-repo-card-head">
+          <span class="gh-lang-dot" style="background:${color}"></span>
+          <h4 class="gh-repo-name">${escHtml(r.name)}</h4>
+          <div class="gh-repo-badges">
+            <span class="gh-badge">⭐ ${r.stars ?? 0}</span>
+            <span class="gh-badge">⑂ ${r.forks ?? 0}</span>
+            ${r.commits != null ? `<span class="gh-badge">📝 ${r.commits}</span>` : ''}
+          </div>
+        </div>
+        <p class="ws-item-sub" style="margin:0">${escHtml(r.description ? r.description.slice(0, 130) : 'No description')}</p>
+        ${r.summary ? `<p class="gh-repo-summary">${escHtml(r.summary.slice(0, 220))}</p>` : ''}
+        <div class="gh-repo-card-foot">
+          <span class="gh-lang-badge" style="background:${color}20;color:${color}">${escHtml(r.language)}</span>
+          <span class="gh-view-link">View Details →</span>
+        </div>
+      </div>`;
+  });
+  cardsHtml += '</div>';
+
+  res.innerHTML = profileHtml + cardsHtml;
+}
+
+async function openRepoModal(fullName) {
+  let overlay = $('gh-modal-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'gh-modal-overlay';
+    overlay.className = 'gh-modal-overlay';
+    overlay.innerHTML = `
+      <div class="gh-modal">
+        <button class="gh-modal-close" onclick="closeRepoModal()">✕</button>
+        <div id="gh-modal-header"></div>
+        <div class="gh-modal-body" id="gh-modal-body"></div>
+        <div class="gh-modal-qa" id="gh-modal-qa" style="display:none">
+          <input id="gh-modal-question" class="ws-chat-input" placeholder="Ask about this repo…" style="flex:1">
+          <button id="gh-modal-ask-btn" class="btn-small" onclick="askModalRepo()">Ask</button>
+        </div>
+        <div id="gh-modal-messages" class="ws-chat-messages" style="max-height:260px;overflow-y:auto;display:none"></div>
+      </div>`;
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeRepoModal(); });
+    document.body.appendChild(overlay);
+  }
+  overlay.style.display = 'flex';
+  window._ghModalRepo = fullName;
+
+  $('gh-modal-header').innerHTML = `<h3 style="margin:0 0 4px">📦 ${escHtml(fullName)}</h3>
+    <a class="d-link" href="https://github.com/${escHtml(fullName)}" target="_blank" rel="noopener">Open on GitHub ↗</a>`;
+  $('gh-modal-body').innerHTML = '<div class="empty-msg">⏳ Full repo analysis — README + key source files read…</div>';
+  $('gh-modal-qa').style.display = 'none';
+  $('gh-modal-messages').style.display = 'none';
+  $('gh-modal-messages').innerHTML = '';
+
+  try {
+    const data = await apiFetch('/api/study/github/explain', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: `https://github.com/${fullName}` }) });
+    if (data.status === 'ok') {
+      $('gh-modal-body').innerHTML = mdToHtml(data.explanation || 'No explanation generated.');
+      $('gh-modal-qa').style.display = 'flex';
+    } else {
+      $('gh-modal-body').innerHTML = `<div class="empty-msg">⚠️ ${escHtml(data.message || 'Analysis failed')}</div>`;
+    }
+  } catch (err) {
+    $('gh-modal-body').innerHTML = `<div class="empty-msg">⚠️ ${escHtml(err.message)}</div>`;
+  }
+}
+
+function closeRepoModal() {
+  const o = $('gh-modal-overlay');
+  if (o) o.style.display = 'none';
+}
+
+async function askModalRepo() {
+  const q = $('gh-modal-question').value.trim();
+  const repo = window._ghModalRepo;
+  if (!q || !repo) return;
+  $('gh-modal-question').value = '';
+  const msgs = $('gh-modal-messages');
+  msgs.style.display = 'flex';
+  hackMsgInto(msgs, 'user', q);
+  const typing = hackMsgInto(msgs, 'assistant', '⏳ Looking for answer…');
+  try {
+    const data = await apiFetch('/api/study/github/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: `https://github.com/${repo}`, question: q }) });
+    typing.remove();
+    if (data.status === 'ok') hackMsgInto(msgs, 'assistant', data.answer || '…');
+    else hackMsgInto(msgs, 'assistant', '⚠️ ' + (data.message || 'No answer found.'));
+  } catch (err) {
+    typing.remove();
+    hackMsgInto(msgs, 'assistant', '⚠️ ' + err.message);
   }
 }
 
@@ -466,11 +582,8 @@ async function askGitHub() {
   try {
     const data = await apiFetch('/api/study/github/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: isUrl ? input : undefined, text: isUrl ? undefined : input, question: q }) });
     typing.remove();
-    if (data.status === 'ok') {
-      hackMsgInto($('github-messages'), 'assistant', data.answer || '…');
-    } else {
-      hackMsgInto($('github-messages'), 'assistant', '⚠️ ' + (data.message || 'Jawab nahi mila'));
-    }
+    if (data.status === 'ok') hackMsgInto($('github-messages'), 'assistant', data.answer || '…');
+    else hackMsgInto($('github-messages'), 'assistant', '⚠️ ' + (data.message || 'Jawab nahi mila'));
   } catch (err) {
     typing.remove();
     hackMsgInto($('github-messages'), 'assistant', '⚠️ ' + err.message);
@@ -549,10 +662,8 @@ function hackMsgInto(container, role, text) {
 
 /* ── Study bind ────────────────────────────────────────── */
 function bindStudy() {
-  $('github-analyze-btn').addEventListener('click', analyzeGitHub);
-  $('github-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') analyzeGitHub(); });
-  $('github-ask-btn').addEventListener('click', askGitHub);
-  $('github-question').addEventListener('keydown', (e) => { if (e.key === 'Enter') askGitHub(); });
+  $('github-analyze-btn').addEventListener('click', analyzeGithubProfile);
+  $('github-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') analyzeGithubProfile(); });
   $('website-analyze-btn').addEventListener('click', analyzeWebsite);
   $('website-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') analyzeWebsite(); });
   $('website-ask-btn').addEventListener('click', askWebsite);

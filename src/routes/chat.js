@@ -570,7 +570,7 @@ router.post('/', requireAuth, async (req, res) => {
 
     // Dynamic Memory Slot A: Core Habits & Preferences (Always active)
     if (scopedMem.habits && scopedMem.habits.length) {
-      contextBlocks.push(`🎯 HABITS & PREFERENCES of Master Nikhil:\n${scopedMem.habits.map(f => `- ${f.text}`).join('\n')}`);
+      contextBlocks.push(`🎯 HABITS & PREFERENCES of the user:\n${scopedMem.habits.map(f => `- ${f.text}`).join('\n')}`);
     }
 
     // Dynamic Memory Slot B: Active Chat Session's Rolling Weekly Summary (Previous compressed history)
@@ -589,7 +589,7 @@ router.post('/', requireAuth, async (req, res) => {
     if (mentionsHackathons) {
       const hacks = await require('../services/hackathonService').listHackathons(req.userId).catch(() => []);
       if (hacks && hacks.length) {
-        contextBlocks.push(`🏆 HACKATHON WORKSPACE (Master Nikhil's active hackathons):\n${hacks.map(h => `- ${h.title} [${h.status}${h.participating ? ', participating ✓' : ''}]${h.endDate ? ` ends ${new Date(h.endDate).toLocaleDateString('en-IN')}` : ''}`).join('\n')}`);
+        contextBlocks.push(`🏆 HACKATHON WORKSPACE (the user's active hackathons):\n${hacks.map(h => `- ${h.title} [${h.status}${h.participating ? ', participating ✓' : ''}]${h.endDate ? ` ends ${new Date(h.endDate).toLocaleDateString('en-IN')}` : ''}`).join('\n')}`);
       }
     }
 
@@ -600,16 +600,16 @@ router.post('/', requireAuth, async (req, res) => {
       githubBlock.forEach(b => contextBlocks.push(b));
     }
     if (autoStats) {
-      contextBlocks.push(`📊 AUTO-ANALYSIS of the data Master Nikhil just provided (exact computed values):\n${autoStats}`);
+      contextBlocks.push(`📊 AUTO-ANALYSIS of the data the user just provided (exact computed values):\n${autoStats}`);
     }
 
     const binaryFileIntent = detectBinaryFileIntent(promptMessage);
     if (binaryFileIntent) {
-      contextBlocks.push(`📎 BINARY FILE REQUEST DETECTED (${binaryFileIntent}): Master Nikhil is asking for a real .${binaryFileIntent} file. You MUST respond with a single \`\`\`filespec JSON block (format: "${binaryFileIntent}") as described in the FILE GENERATION section — do NOT use a plain \`\`\`${binaryFileIntent} filename=... \`\`\` text block.`);
+      contextBlocks.push(`📎 BINARY FILE REQUEST DETECTED (${binaryFileIntent}): the user is asking for a real .${binaryFileIntent} file. You MUST respond with a single \`\`\`filespec JSON block (format: "${binaryFileIntent}") as described in the FILE GENERATION section — do NOT use a plain \`\`\`${binaryFileIntent} filename=... \`\`\` text block.`);
     }
 
     if (userDocuments.length) {
-      contextBlocks.push(`📄 DOCUMENT(S) ATTACHED: Master Nikhil ne ${userDocuments.length} file(s) attach ki hai(n) — real extracted text neeche "ATTACHED DOCUMENT(S)" block mein hai. Jo bhi answer/table/file banao wo SIRF is real extracted text se banao. Kabhi bhi apni taraf se facts invent mat karo.`);
+      contextBlocks.push(`📄 DOCUMENT(S) ATTACHED: the user ne ${userDocuments.length} file(s) attach ki hai(n) — real extracted text neeche "ATTACHED DOCUMENT(S)" block mein hai. Jo bhi answer/table/file banao wo SIRF is real extracted text se banao. Kabhi bhi apni taraf se facts invent mat karo.`);
     }
 
     const memoryContext = contextBlocks.join('\n\n');
@@ -620,9 +620,9 @@ router.post('/', requireAuth, async (req, res) => {
 
     // 1. CORE BASE PROMPT (~280 tokens — always active)
     const promptModules = [
-      `You are Ek Sathi, an intelligent, ultra-loyal personal AI companion created exclusively for your Master, Nikhil.
-- Always know that your Master and creator is Nikhil (email: ${req.userEmail || 'Nikhil'}).
-- Be respectful, concise, highly capable, and address Master Nikhil warmly in Hinglish/English.
+      `You are Ek Sathi — a friendly, curious AI companion. Think of a smart, caring best friend, NOT a servant or tool that was built for one specific boss.
+- Talk to the user as an equal: warm, playful, and encouraging, never subservient. Reply naturally in Hinglish/English.
+- Never call yourself a "Master", "owner", "boss", or "creator". Never claim you were made for one named person. If the user shares their name, just use it casually the way a friend would.
 - Be proactive! Suggest logical next steps, improvements, or tips whenever helpful.
 - Current IST time: ${nowIST}
 
@@ -632,7 +632,7 @@ router.post('/', requireAuth, async (req, res) => {
 - Lists for steps; Markdown tables for comparisons. Keep spacing clean (no unbroken text walls).
 
 ━━━ 🧠 PERSISTENT MEMORY PROTOCOL ━━━
-When Master Nikhil shares important personal info, asks you to remember/track progress (like solved questions, goals, habits, preferences, tech rules, decisions), YOU MUST capture and save it permanently into his Memory database.
+When the user shares important personal info, asks you to remember/track progress (like solved questions, goals, habits, preferences, tech rules, decisions), YOU MUST capture and save it permanently into the user's Memory database.
 
 TRIGGER PHRASES (always save when you detect these — even with typos):
 - "yaad rakh", "yaad rakhna", "remember this", "memory me store", "store karo memory me"
@@ -641,7 +641,7 @@ TRIGGER PHRASES (always save when you detect these — even with typos):
 
 To save a memory fact, output a clean memory block at the END of your response:
 \`\`\`memory
-{ "fact": "Nikhil ne 3 LeetCode problems solve ki hain: Two Sum, Remove Element, Contains Duplicate", "category": "main" }
+{ "fact": "User ne 3 LeetCode problems solve ki hain: Two Sum, Remove Element, Contains Duplicate", "category": "main" }
 \`\`\`
 Categories: "habits" (habits/personal bio), "main" (core progress/stats/facts), "hackathons" (hackathon details).
 You can output one or more \`\`\`memory ... \`\`\` blocks whenever new milestones or facts need to be saved.
@@ -683,7 +683,7 @@ When asked for a flowchart, roadmap, or timeline, output a Mermaid block (no fil
     const wantsSchedule = /(?:remind me|schedule a|schedule task|kal\s+\d|every day at|har din at|alarm lagao|notify me at)/i.test(promptMessage);
     if (wantsSchedule) {
       promptModules.push(`━━━ ⏰ SCHEDULED SELF-MESSAGING ━━━
-When Master asks to schedule something, output a \`\`\`schedule block:
+When the user asks to schedule something, output a \`\`\`schedule block:
 \`\`\`schedule\n{ "title": "Task Name", "prompt": "Detailed task instructions", "scheduledAt": "ISO_8601_IST_STRING", "repeat": "none|daily|weekly" }\n\`\`\``);
     }
 
@@ -702,7 +702,7 @@ Auto-extracted media data is provided in context below. Read full transcript/cap
     }
 
     // Combine active modules
-    const systemPrompt = `${promptModules.join('\n\n')}\n\n- You have full access to historical chat summaries, habits, and stored facts about Master Nikhil.\n${memoryContext}${mediaEnrichment.mediaContext}${documentContext}`;
+    const systemPrompt = `${promptModules.join('\n\n')}\n\n- You have full access to historical chat summaries, habits, and stored facts about the user.\n${memoryContext}${mediaEnrichment.mediaContext}${documentContext}`;
 
 
     // 5. Call Answering Agent LLM.

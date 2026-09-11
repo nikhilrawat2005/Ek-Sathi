@@ -511,7 +511,7 @@ async function chatSend(userId, hackId, message) {
   const recent = await memory.getRecentMessages(userId, sid, 20);
   const context = await buildHackContext(userId, updatedHack);
 
-  const systemPrompt = `You are Ek Sathi, Master Nikhil's personal AI companion, inside the "${hack.title}" HACKATHON WORKSPACE.
+  const systemPrompt = `You are Ek Sathi, a friendly AI companion, inside the "${hack.title}" HACKATHON WORKSPACE.
 This chat is STRICTLY about this hackathon only. Never bring up vault, stalking, other hackathons, or other chats.
 Help with ideation, planning, team formation, tech stack, implementation, submission prep, and timelines.
 
@@ -519,7 +519,7 @@ HACKATHON KNOWLEDGE:
 ${context}
 ${
   knowledgeUpdated
-    ? '\n[SYSTEM: Master ne abhi hackathon announcement paste kiya. Knowledge panel update ho gaya. Confirm karo aur key highlights mention karo — dates, prize, mode. Fir poocho kya help chahiye.]'
+    ? '\n[SYSTEM: The user just pasted the hackathon announcement. Knowledge panel updated. Confirm key highlights — dates, prize, mode. Then ask how you can help.]'
     : ''
 }
 

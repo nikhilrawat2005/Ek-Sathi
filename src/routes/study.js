@@ -73,6 +73,35 @@ router.get('/github/user', requireAuth, async (req, res) => {
   }
 });
 
+// GET /api/study/github/profile?username=X → DEEP profile scan: ALL repos,
+// commit counts, README summaries + combined overview box data (~70000 char budget)
+router.get('/github/profile', requireAuth, async (req, res) => {
+  try {
+    const username = String(req.query.username || '').trim();
+    if (!username) return res.status(400).json({ error: 'Username or profile link required (?username=...)' });
+    const result = await repo.getUserProfileFull(username, { capRepos: req.query.cap });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/study/github/explain { url|text } → full LLM explanation for a repo card
+router.post('/github/explain', requireAuth, async (req, res) => {
+  try {
+    const input = req.body && req.body.url ? String(req.body.url) : (req.body && req.body.text ? String(req.body.text) : '');
+    if (!input.trim()) return res.status(400).json({ error: 'Provide a GitHub repo URL or "owner/repo" text.' });
+    const analysis = await repo.analyzeRepo(input);
+    if (analysis.status !== 'ok') {
+      return res.status(200).json({ status: analysis.status, message: analysis.message || 'Repo analyze nahi ho paya.' });
+    }
+    const explained = await repo.explainRepo(analysis);
+    res.json({ status: 'ok', repo: analysis.repo, explanation: explained.explanation || '', readCount: analysis.readCount || 0 });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/study/website { url }
 router.post('/website', requireAuth, async (req, res) => {
   try {
