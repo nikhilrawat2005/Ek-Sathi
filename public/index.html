@@ -2,64 +2,57 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Ek Sathi — Your AI Companion for Learning & Growth</title>
-  <meta name="description" content="Ek Sathi is your AI companion. Chat with AI, track hackathons, and study GitHub repos & websites." />
   <link rel="icon" href="/favicon.png" />
-  <link rel="stylesheet" href="/style.css?v=5" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css?v=7" />
 </head>
 <body>
-  <div id="app-screen" class="app-layout">
+  <div class="app-layout">
 
     <!-- ═══ SIDEBAR ═══ -->
-    <aside id="sidebar" class="sidebar">
+    <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
         <div class="sidebar-logo">
           <div class="logo-orb small"></div>
           <span>Ek Sathi</span>
         </div>
-        <button id="toggle-sidebar-btn" class="btn-icon sidebar-toggle" title="Toggle sidebar">☰</button>
+        <button class="btn-icon" id="toggle-sidebar-btn" title="Menu">☰</button>
       </div>
-
-      <button id="new-chat-btn" class="btn-new-chat">＋ New Chat</button>
-
+      <button class="btn-new-chat" id="new-chat-btn">＋ New Chat</button>
       <nav class="sidebar-nav">
-        <button class="nav-btn active" data-view="chat"><span class="nav-icon">💬</span> Chat</button>
-        <button class="nav-btn" data-view="hackathon"><span class="nav-icon">🏆</span> Hackathon Lab</button>
-        <button class="nav-btn" data-view="study"><span class="nav-icon">📚</span> Study</button>
+        <button class="nav-btn active" data-view="chat"><span class="nav-icon">💬</span>Chat</button>
+        <button class="nav-btn" data-view="hackathon"><span class="nav-icon">🏆</span>Hackathon Lab</button>
+        <button class="nav-btn" data-view="study"><span class="nav-icon">📦</span>Study</button>
       </nav>
-
       <div class="sidebar-chats-section">
-        <div class="sidebar-section-label flex-between">
-          <span>Chats</span>
-        </div>
-        <div id="sessions-list" class="sessions-list"></div>
+        <div class="sidebar-section-label flex-between"><span>Chats</span></div>
+        <div class="sessions-list" id="sessions-list"></div>
       </div>
-
       <div class="sidebar-bottom">
         <div class="user-row">
-          <div class="user-avatar">🦉</div>
+          <div class="user-avatar">👤</div>
           <div class="user-info">
             <div class="user-name">Nikhil</div>
-            <div class="user-email">local mode</div>
+            <div class="user-email">Local mode</div>
           </div>
-          <button id="logout-btn" class="btn-icon" title="Clear local data">↺</button>
+          <button class="btn-icon" id="logout-btn" title="Clear local data">♻️</button>
         </div>
       </div>
     </aside>
 
-    <!-- ═══ MAIN AREA ═══ -->
-    <main id="main" class="main-content">
+    <!-- ═══ MAIN CONTENT ═══ -->
+    <main class="main-content">
 
       <!-- ─── CHAT VIEW ─── -->
       <section class="view active" id="view-chat">
-        <div class="view-header chat-header">
-          <button id="mobile-menu-btn" class="btn-icon mobile-menu-btn">☰</button>
-          <h2 id="chat-session-title" class="view-title">New Chat</h2>
+        <div class="view-header">
+          <div>
+            <div class="view-title" id="chat-session-title">New Chat</div>
+          </div>
           <div class="view-header-actions">
-            <button id="tts-toggle-btn" class="btn-small" title="Toggle Voice">🔊 Voice</button>
-            <select id="model-selector" class="model-select" title="Preferred model">
+            <select class="model-select" id="model-selector" title="Preferred model">
               <option value="">Auto (Smart)</option>
               <option value="google/gemini-2.5-flash-lite">Gemini Flash Lite</option>
               <option value="google/gemini-2.5-flash">Gemini Flash</option>
@@ -69,72 +62,41 @@
             </select>
           </div>
         </div>
-        <div id="messages-container" class="messages-container">
-          <div id="welcome-screen" class="welcome-screen">
-            <div class="welcome-orb">🦉</div>
-            <h1 class="welcome-title">Hi, I'm Ek Sathi</h1>
-            <p class="welcome-sub">Your AI Companion for Learning & Growth</p>
-            <div class="welcome-suggestions" id="welcome-suggestions">
-              <button class="welcome-chip">Explain a coding concept</button>
-              <button class="welcome-chip">Help me debug this code</button>
-              <button class="welcome-chip">What should I learn next?</button>
-              <button class="welcome-chip">Build me a study plan</button>
-            </div>
-          </div>
-        </div>
+        <div class="messages-container" id="messages-container"></div>
         <div class="input-area">
           <div class="file-chip-row" id="file-chip-row"></div>
           <div class="input-row">
-            <button id="attach-btn" class="attach-btn" title="Attach file">📎</button>
+            <button class="attach-btn" id="attach-btn" title="Attach file">📎</button>
             <input type="file" id="file-upload-input" multiple hidden accept=".txt,.md,.csv,.json,.js,.ts,.py,.java,.c,.cpp,.html,.css,.xml,.pdf,.docx,.pptx,.xlsx,.xls,.zip" />
-            <textarea id="message-input" placeholder="Message Ek Sathi..." rows="1" maxlength="8000"></textarea>
-            <button id="send-btn" class="send-btn" title="Send (Enter)">➤</button>
+            <textarea class="message-input" id="message-input" placeholder="Message Ek Sathi..." rows="1" maxlength="8000"></textarea>
+            <button class="send-btn" id="send-btn" title="Send">➤</button>
           </div>
         </div>
       </section>
 
-      <!-- ─── HACKATHON VIEW ─── -->
+      <!-- ─── HACKATHON LAB VIEW ─── -->
       <section class="view" id="view-hackathon">
         <div class="view-header">
           <div>
-            <h2 class="view-title">🏆 Hackathon Lab</h2>
-            <p class="view-sub">Discover, track and manage hackathons — with AI-powered workspace chat.</p>
+            <div class="view-title">🏆 Hackathon Lab</div>
+            <div class="view-sub">Real hackathons &amp; internships scraped live — IT sector</div>
           </div>
           <div class="view-header-actions">
-            <button id="hack-discover-btn" class="btn-small" title="Auto-discover hackathons">🔍 Discover</button>
-            <button id="hack-add-btn" class="btn-small" title="Add a hackathon">＋ Add</button>
+            <span class="scan-status" id="scan-status"></span>
+            <button class="btn-small" id="hack-scan-btn" title="Scrape now">🔄 Scan Now</button>
           </div>
         </div>
-        <div class="hack-workspace">
-          <!-- LEFT: hackathon list -->
-          <div class="ws-list-col">
-            <div class="ws-list" id="hack-list"></div>
-          </div>
-          <!-- CENTER: selected hackathon details + chat -->
-          <div class="ws-chat-col" id="hack-chat-col">
-            <div id="hack-empty-state" class="empty-state">
-              <p>Select a hackathon from the left or add a new one.</p>
-            </div>
-            <div id="hack-workspace" class="hack-ws-inner" style="display:none">
-              <div class="hack-detail-bar">
-                <div class="hack-detail-info">
-                  <h3 id="hack-title" class="hack-detail-title"></h3>
-                  <div class="hack-detail-meta" id="hack-meta"></div>
-                </div>
-                <div class="hack-detail-actions">
-                  <button id="hack-scrape-btn" class="btn-small" title="Re-scrape details">🔄 Refresh</button>
-                  <label class="ws-toggle" title="Participating → AI Chat Context">
-                    <input type="checkbox" id="hack-participating" /> Participating
-                  </label>
-                </div>
-              </div>
-              <div class="ws-chat-messages" id="hack-messages"></div>
-              <div class="ws-chat-input-row">
-                <textarea id="hack-input" placeholder="Ask about this hackathon..." rows="1" maxlength="4000"></textarea>
-                <button id="hack-send" class="btn-small">Send</button>
-              </div>
-            </div>
-          </div>
+        <div class="discover-toolbar">
+          <input class="study-input" id="discover-filter" placeholder="Filter by title, prize, tags, source..." />
+          <select class="model-select" id="discover-source-filter">
+            <option value="">All sources</option>
+            <option value="devpost">Devpost</option>
+            <option value="unstop">Unstop</option>
+            <option value="devfolio">Devfolio</option>
+          </select>
+        </div>
+        <div class="hack-workspace" style="flex:1;min-height:0;">
+          <div class="discover-grid" id="discover-grid"></div>
         </div>
       </section>
 
@@ -142,8 +104,8 @@
       <section class="view" id="view-study">
         <div class="view-header">
           <div>
-            <h2 class="view-title">📚 GitHub & Website Study</h2>
-            <p class="view-sub">Analyze any GitHub repo or website — get AI-powered insights, architecture maps, and Q&A.</p>
+            <div class="view-title">📦 Study</div>
+            <div class="view-sub">Analyze any GitHub repo or website — get AI-powered insights, architecture maps, and Q&amp;A.</div>
           </div>
         </div>
         <div class="study-tabs">
@@ -195,47 +157,10 @@
     </main>
   </div>
 
-  <!-- Hackathon add/edit modal -->
-  <div id="hack-modal" class="modal-overlay" style="display:none">
-    <div class="modal">
-      <div class="modal-header">
-        <h3 id="hack-modal-title">Add Hackathon</h3>
-        <button id="hack-modal-close" class="btn-icon">✕</button>
-      </div>
-      <div class="modal-body">
-        <div class="form-group">
-          <label>Paste hackathon link or full text</label>
-          <textarea id="hack-paste-input" rows="4" placeholder="Paste hackathon announcement from WhatsApp / LinkedIn / Devpost / Unstop..."></textarea>
-        </div>
-        <div class="form-actions">
-          <button id="hack-parse-btn" class="btn-primary">🤖 Auto-Parse</button>
-          <button id="hack-manual-btn" class="btn-neutral">Manual Fill</button>
-        </div>
-        <div id="hack-form" style="display:none">
-          <div class="form-group"><label>Title *</label><input type="text" id="hack-f-title" /></div>
-          <div class="form-group"><label>Link *</label><input type="url" id="hack-f-link" /></div>
-          <div class="form-group"><label>Source</label><input type="text" id="hack-f-source" placeholder="Devpost / Unstop / Devfolio" /></div>
-          <div class="form-row">
-            <div class="form-group"><label>Start Date</label><input type="date" id="hack-f-start" /></div>
-            <div class="form-group"><label>End Date</label><input type="date" id="hack-f-end" /></div>
-          </div>
-          <div class="form-group"><label>Mode</label><select id="hack-f-mode"><option value="">—</option><option>Online</option><option>Offline</option><option>Hybrid</option></select></div>
-          <div class="form-group"><label>Prize</label><input type="text" id="hack-f-prize" /></div>
-          <div class="form-group"><label>Description</label><textarea id="hack-f-desc" rows="3"></textarea></div>
-          <div class="form-group"><label>Rules / Eligibility</label><textarea id="hack-f-rules" rows="3"></textarea></div>
-          <div class="form-actions">
-            <button id="hack-save-btn" class="btn-primary">Save</button>
-            <button id="hack-cancel-btn" class="btn-neutral">Cancel</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
-  <script src="/app.js?v=5"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="/app.js?v=7"></script>
 </body>
 </html>
