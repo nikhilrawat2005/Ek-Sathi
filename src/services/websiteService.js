@@ -17,7 +17,9 @@ const cache = new Map();
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
-const GENERIC_FONTS = new Set(['serif', 'sans-serif', 'monospace', 'cursive', 'fantasy', 'system-ui', 'ui-sans-serif', 'ui-serif', 'ui-monospace', 'ui-rounded', 'emoji', 'math', 'fangsong', 'inherit', 'initial', 'unset', 'revert']);
+const GENERIC_FONTS = new Set(['serif', 'sans-serif', 'monospace', 'cursive', 'fantasy', 'system-ui', 'ui-sans-serif', 'ui-serif', 'ui-monospace', 'ui-rounded', 'emoji', 'math', 'fangsong', 'inherit', 'initial', 'unset', 'revert',
+  'arial', 'helvetica', 'helvetica neue', 'times', 'times new roman', 'tahoma', 'verdana', 'geneva', 'trebuchet ms', 'georgia', 'garamond', 'courier', 'courier new', 'segoe ui', 'calibri', 'cambria', 'candara', 'consolas', 'constantia', 'corbel', 'lucida grande', 'lucida', 'sans', 'ms sans serif', 'ms serif', 'ancient serif', 'arial black', 'impact', 'palatino', 'palatino linotype', 'book antiqua', 'century gothic', 'franklin gothic medium', 'copperplate', 'papyrus', 'gabriola', 'webdings', 'wingdings', 'symbol', 'bahnschrift', 'dfkai-sb', 'lucida console', 'ms ui gothic', 'simsun', 'songti sc', 'pingfang sc',
+]);
 
 function normalizeUrl(input) {
   let u = String(input || '').trim();
@@ -121,7 +123,6 @@ function extractPage($, html, baseUrl) {
 // ── Font + color analysis over CSS text ────────────────────
 function analyzeDesign(cssText, pages) {
   const css = String(cssText || '').slice(0, CSS_BUDGET);
-  const fonts = [];
   const fontCount = new Map();
 
   // font-family declarations
@@ -135,14 +136,13 @@ function analyzeDesign(cssText, pages) {
       fontCount.set(p, (fontCount.get(p) || 0) + 1);
     }
   }
-  // @font-face blocks
+  // @font-face blocks — record names as authoritative, but do NOT inflate the usage
+  // count: a face that only appears in its own @font-face (never used) is a ghost.
+  const ffNames = new Set();
   const ffRe = /@font-face\s*\{([^}]+)\}/gi;
   while ((m = ffRe.exec(css)) !== null) {
     const fm = m[1].match(/font-family\s*:\s*['"]?([^;'"{}]+)/);
-    if (fm) {
-      const name = fm[1].trim();
-      if (!fontCount.has(name)) fontCount.set(name, 1);
-    }
+    if (fm) ffNames.add(fm[1].trim());
   }
   // CSS custom properties with font stacks
   const varRe = /--[a-z0-9-]*(?:font|family)[a-z0-9-]*\s*:\s*([^;]+)/gi;
@@ -166,7 +166,22 @@ function analyzeDesign(cssText, pages) {
   }
 
   const sortedFonts = [...fontCount.entries()].sort((a, b) => b[1] - a[1]);
-  for (const [name, count] of sortedFonts.slice(0, 8)) fonts.push({ name, weight: count });
+  // Trust a font when it is used at least 3 times across the CSS, OR it was loaded
+  // via a CDN <link> (never counts as noise), OR it is declared via @font-face AND
+  // actually used at least twice. One-off @font-face-only faces are ghosts.
+  const picked = [];
+  for (const [name, count] of sortedFonts) {
+    const verified = cdnSeen.has(name) || (ffNames.has(name) && count >= 2);
+    if (verified || count >= 3) {
+      picked.push({ name, weight: count });
+      if (picked.length >= 8) break;
+    }
+  }
+  if (!picked.length) {
+    // nothing credible — fall back to the highest-frequency names
+    for (const [name, count] of sortedFonts.slice(0, 6)) picked.push({ name, weight: count });
+  }
+  const fonts = picked;
 
   // colors
   const colorCount = new Map();
@@ -198,7 +213,24 @@ function analyzeDesign(cssText, pages) {
   const rgbRe = /rgba?\([\d.]+[,\s]+[\d.]+[,\s]+[\d.]+[^)]*\)/g;
   while ((m = rgbRe.exec(css)) !== null) { const h = rgbToHex(m[0]); if (h) addColor(h); }
 
-  const colors = [...colorCount.entries()]
+  // Bucket near-identical grays together so #333/#373737/#3c3c3c don't flood the
+// "top 10" and crowd out the real brand accent colors.
+  const bucketGray = (hex) => {
+    const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    if (mx - mn <= 16) {
+      const q = (n) => Math.min(255, Math.round(n / 16) * 16);
+      return '#' + [q(r), q(g), q(b)].map(n => n.toString(16).padStart(2, '0')).join('');
+    }
+    return hex;
+  };
+  const mergedCounts = new Map();
+  for (const [hex, count] of colorCount) {
+    const b = bucketGray(hex);
+    mergedCounts.set(b, (mergedCounts.get(b) || 0) + count);
+  }
+
+  const colors = [...mergedCounts.entries()]
     .sort((a, b) => b[1] - a[1])
     .slice(0, 10)
     .map(([hex, count]) => ({ hex, count }));
@@ -225,7 +257,10 @@ function detectStack(htmls, headers, cssText) {
   if (/__remix_context|remix\.route/i.test(hay)) add(out.ssg, 'Remix');
   if (/preact\.min|preact\/dist/i.test(hay)) add(out.frameworks, 'Preact');
   if (/solid\.js|data-hk=/i.test(hay)) add(out.frameworks, 'SolidJS');
-  if (/<!--.*wp-content|wp-content\/|wp-includes\/|\/wp-json/i.test(hay)) { add(out.cms, 'WordPress (PHP)'); add(out.runtime, 'PHP'); }
+  if (/<!--.*wp-content|wp-content\/|wp-includes\/|\/wp-json|wp-emoji-release|wp-admin/i.test(hay)) { add(out.cms, 'WordPress (PHP)'); add(out.runtime, 'PHP'); }
+  if (/(elementor|wp-bakery|wpbakery|js_composer)/i.test(hay)) add(out.cms, 'Page builder (Elementor/WPBakery)');
+  if (/divi-builder|et_bloom|et_pb_/i.test(hay)) add(out.cms, 'Divi Builder');
+  if (/^.*wp-content\/themes\/[a-z0-9-]+/im.test(hay)) add(out.cms, 'WordPress custom theme');
   if (/blogger\.com|blogspot\.com|data:blog\./i.test(hay)) add(out.cms, 'Blogger');
   if (/cdn\.shopify\.com|\/cart\.js|Shopify\.theme/i.test(hay)) add(out.cms, 'Shopify');
   if (/wix\.com.*viewer|static\.parastorage\.com|XW_Viewer/i.test(hay)) add(out.cms, 'Wix');
@@ -249,6 +284,12 @@ function detectStack(htmls, headers, cssText) {
   if (/chart\.js|Chartjs|chart\.min/i.test(hay)) add(out.libraries, 'Chart.js');
   if (/swiper|swiper\.js/i.test(hay)) add(out.libraries, 'Swiper/slider');
   if (/lucide|fontawesome|@fortawesome|fa-solid/i.test(hay)) add(out.libraries, 'icon system (Lucide/FontAwesome)');
+  if (/(?:jquery|jquery\.min|jquery-)[\s'"\/.]/i.test(hay)) add(out.libraries, 'jQuery');
+  if (/(gtag|googletagmanager\.com|google-analytics\.com|dataLayer)/i.test(hay)) add(out.libraries, 'Google Analytics / gtag');
+  if (/googletagmanager\.com\/ns\.html|GTM-/i.test(hay)) add(out.libraries, 'Google Tag Manager');
+  if (/(facebook\/en_US|fbq\(|connect\.facebook\.net)/i.test(hay)) add(out.libraries, 'Meta Pixel');
+  if (/clarity\.ms|clarity\.js/i.test(hay)) add(out.libraries, 'Microsoft Clarity');
+  if (/doubleclick\.net|googlesyndication\.com/i.test(hay)) add(out.libraries, 'Google Ads/DoubleClick');
   if (/(?:https?:\/\/|[^a-z])cdn\.(?:jsdelivr|unpkg|place?)\./i.test(hay)) add(out.libraries, 'CDN delivery');
 
   // header hints
@@ -319,18 +360,32 @@ async function deepScrapeSite(urlInput, opts = {}) {
     const allHtml = [html, ...pageSnippets.map(p => '')].join('');
     const stack = detectStack([html], mainRes.headers, cssTotal);
 
-    // JSON-LD types from raw html
+    // JSON-LD types from raw html (walk nested @graph/@type trees too)
     const jsonLdTypes = [];
     try {
       const $l = cheerio.load(html);
+      const collectTypes = (node) => {
+        if (!node || typeof node !== 'object') return;
+        if (Array.isArray(node)) { node.forEach(collectTypes); return; }
+        const t = node['@type'];
+        if (t) (Array.isArray(t) ? t : [t]).forEach(x => { if (x && !jsonLdTypes.includes(x)) jsonLdTypes.push(x); });
+        collectTypes(node.itemListElement);
+        collectTypes(node.mainEntity);
+        collectTypes(node['@graph']);
+        collectTypes(node.offers);
+        collectTypes(node.address);
+        collectTypes(node.publisher);
+      };
       $l('script[type="application/ld+json"]').each((_, el) => {
-        try {
-          const j = JSON.parse($l(el).html());
-          const t = j['@type'] || (j['@graph'] && j['@graph'][0] && j['@graph'][0]['@type']);
-          if (t) (Array.isArray(t) ? t : [t]).forEach(x => { if (!jsonLdTypes.includes(x)) jsonLdTypes.push(x); });
-        } catch (_) {}
+        try { collectTypes(JSON.parse($l(el).html())); } catch (_) {}
       });
+      // @graph key is a valid JS key — handled via bracket access above
     } catch (_) {}
+
+    // locale / language / brand-color hints
+    const langMatch = html.match(/lang="([^"]+)"/i);
+    const localeMatch = html.match(/og:locale(?:["=][^"]*)?\s*content="([^"]+)"/i);
+    const themeMatch = html.match(/theme-color"\s*content="([^"]+)"/i);
 
     const design = analyzeDesign(cssTotal, [main, ...pageSnippets]);
 
@@ -350,6 +405,9 @@ async function deepScrapeSite(urlInput, opts = {}) {
       stack,
       design,
       jsonLdTypes,
+      lang: langMatch ? langMatch[1] : '',
+      locale: localeMatch ? localeMatch[1] : '',
+      themeColor: themeMatch ? themeMatch[1] : '',
       pages: [{ url, title: main.title || 'Home' }, ...pageList],
       forms: main.forms,
       headings: main.headings.slice(0, 14),
@@ -402,6 +460,7 @@ Reply ONLY clean markdown with EXACTLY these section headers (keep every header)
 
 Rules:
 - Base EVERY claim on the extracted evidence. If a section has no evidence, say exactly that in one line.
+- Be HONEST about confidence: ek specific page/page-section ke baare me sirf page ki TITLE se andaaza laga rahe ho to clearly mark it — "this page's title suggests it is likely X" — kabhi bhi guess ko pakka fact ki tarah mat present karo.
 - Explain HOW the site is built (framework, styling, hosting hints, SSR, CMS).
 - Typography: interpret the detected font families (names, pairing, vibe), UI scale hints if visible.
 - Colors: interpret the palette (primary/secondary/neutral roles from tokens or frequency), pick 2 adjectives for the vibe.
@@ -419,6 +478,7 @@ COLOR PALETTE: ${colorsStr}
 DESIGN TOKENS: ${tokensStr || 'none'}
 PAGES (${site.pages.length}): ${site.pages.map(p => p.title || p.url).slice(0, 12).join(' → ')}
 FORMS: ${site.forms.map(f => `${f.method} ${f.action.slice(0, 60)}`).join('; ') || 'none visible'}
+LANG: ${site.lang || 'not set'} · LOCALE: ${site.locale || 'not set'} · THEME COLOR: ${site.themeColor || 'none'}
 
 ${websiteText}
 
@@ -438,6 +498,9 @@ ${visibleSnippet || 'No readable text was extracted.'}`,
       stack: site.stack,
       design: site.design,
       jsonLdTypes: site.jsonLdTypes,
+      lang: site.lang,
+      locale: site.locale,
+      themeColor: site.themeColor,
       pages: site.pages,
       forms: site.forms,
       textChars: site.textChars,
