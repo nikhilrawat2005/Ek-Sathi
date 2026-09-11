@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
   <title>Ek Sathi — Your AI Companion for Learning &amp; Growth</title>
-  <meta name="description" content="Bob is your personal AI assistant with memory, file handling, and intelligent conversation." />
+  <meta name="description" content="Ek Sathi is your AI companion for learning and growth — hackathon tracking, GitHub & website study, AI study help and more." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <!-- JetBrains Mono was referenced in 12 CSS rules but never actually loaded,
@@ -14,98 +14,23 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
   <meta name="theme-color" content="#08090c" />
   <meta name="color-scheme" content="dark" />
-  <link rel="stylesheet" href="style.css?v=2" />
-  <!-- Favicon: Tech Builder Cat -->
+  <link rel="stylesheet" href="style.css?v=3" />
+  <!-- Favicon: Ek Sathi owl -->
   <link rel="icon" type="image/jpeg" href="/favicon.png" />
   <link rel="apple-touch-icon" href="/favicon.png" />
 
 </head>
 <body>
 
-  <!-- ═══════════════════════════════ LOGIN SCREEN ═══════════════════════════════ -->
-  <div id="login-screen" class="screen active">
-    <div class="login-bg"></div>
-    <div class="login-card">
-      <div class="login-logo">
-        <img src="/favicon.png" class="logo-cat" alt="Bob" />
-        <span class="logo-text">Bob</span>
-      </div>
-      <p class="login-subtitle">Your personal AI assistant</p>
-
-      <form id="login-form" autocomplete="on">
-        <div class="field-group">
-          <label for="login-email">Email</label>
-          <input id="login-email" type="email" placeholder="you@example.com" autocomplete="email" required />
-        </div>
-        <div class="field-group">
-          <label for="login-password">Password</label>
-          <input id="login-password" type="password" placeholder="••••••••" autocomplete="current-password" required />
-        </div>
-        <div id="login-error" class="error-msg hidden"></div>
-        <button id="login-btn" type="submit" class="btn-primary">
-          <span id="login-btn-text">Sign In</span>
-          <span id="login-spinner" class="spinner hidden"></span>
-        </button>
-      </form>
-
-      <div class="auth-divider">
-        <span>OR</span>
-      </div>
-
-      <button id="google-login-btn" type="button" class="btn-google">
-        <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/><path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.23v3.15C3.25 21.37 7.37 24 12 24z"/><path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.23C.44 8.15 0 9.99 0 12s.44 3.85 1.23 5.42l4.05-3.15z"/><path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.37 0 3.25 2.63 1.23 6.58l4.05 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/></svg>
-        <span>Sign in with Google</span>
-      </button>
-
-      <p class="login-footer">
-        Don't have an account?
-        <a href="#" id="goto-register">Create one</a>
-      </p>
-    </div>
-  </div>
-
-  <!-- ═══════════════════════════════ REGISTER SCREEN ════════════════════════════ -->
-  <div id="register-screen" class="screen">
-    <div class="login-bg"></div>
-    <div class="login-card">
-      <div class="login-logo">
-        <img src="/favicon.png" class="logo-cat" alt="Bob" />
-        <span class="logo-text">Bob</span>
-      </div>
-      <p class="login-subtitle">Create your account</p>
-
-      <form id="register-form" autocomplete="on">
-        <div class="field-group">
-          <label for="reg-email">Email</label>
-          <input id="reg-email" type="email" placeholder="you@example.com" autocomplete="email" required />
-        </div>
-        <div class="field-group">
-          <label for="reg-password">Password</label>
-          <input id="reg-password" type="password" placeholder="Min 6 characters" autocomplete="new-password" required />
-        </div>
-        <div id="reg-error" class="error-msg hidden"></div>
-        <button id="reg-btn" type="submit" class="btn-primary">
-          <span id="reg-btn-text">Create Account</span>
-          <span id="reg-spinner" class="spinner hidden"></span>
-        </button>
-      </form>
-
-      <p class="login-footer">
-        Already have an account?
-        <a href="#" id="goto-login">Sign In</a>
-      </p>
-    </div>
-  </div>
-
   <!-- ═══════════════════════════════ MAIN APP ═══════════════════════════════════ -->
-  <div id="app-screen" class="screen">
+  <div id="app-screen" class="screen active">
 
     <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
       <div class="sidebar-header">
         <div class="sidebar-logo">
-          <img src="/favicon.png" class="logo-cat small" alt="Bob HQ" />
-          <span>Bob HQ</span>
+          <div class="logo-orb small"></div>
+          <span>Ek Sathi</span>
         </div>
         <button id="new-chat-btn" class="btn-new-chat" title="New Chat">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -114,7 +39,7 @@
 
       <!-- HQ Nav (Home HQ only — sab modules Home HQ ke cards se khulenge) -->
       <nav class="sidebar-nav" id="sidebar-nav">
-        <button class="nav-btn" data-view="hq" title="Bob HQ dashboard">
+        <button class="nav-btn" data-view="hq" title="Ek Sathi dashboard">
           <span class="nav-ico">🏠</span>Home HQ
         </button>
       </nav>
@@ -154,10 +79,10 @@
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
           </button>
           <div class="persona-switch" id="persona-switch">
-            <button class="persona-btn active" data-persona="bob" title="Bob — personal assistant">
-              <span class="persona-orb bob">🧑</span>Bob
+            <button class="persona-btn active" data-persona="bob" title="Ek Sathi — your AI companion">
+              <span class="persona-orb bob">🦉</span>Ek Sathi
             </button>
-            <button class="persona-btn" data-persona="builder" title="Bob the Builder — project planning & prompt packs">
+            <button class="persona-btn" data-persona="builder" title="Builder — project planning & prompt packs">
               <span class="persona-orb builder">🏗️</span>Builder
             </button>
           </div>
@@ -166,7 +91,7 @@
             <button id="btn-rename-current-session" class="btn-rename-topbar" title="Rename this chat" style="display:none; background:var(--surface2); border:1px solid var(--border2); color:var(--text2); cursor:pointer; font-size:12px; padding:3px 6px; border-radius:4px; transition:all 0.2s;">✏️ Rename</button>
           </div>
           <div class="topbar-actions">
-            <button id="tts-toggle-btn" class="icon-btn tts-btn" title="Toggle Bob Voice (Hinglish)" style="padding: 4px 10px; font-size: 13px; display: flex; align-items: center; gap: 4px;">
+            <button id="tts-toggle-btn" class="icon-btn tts-btn" title="Toggle Voice (Hinglish)" style="padding: 4px 10px; font-size: 13px; display: flex; align-items: center; gap: 4px;">
               <span id="tts-icon">🔊</span>
               <span id="tts-label" style="font-size:12px; font-weight:500;">Voice ON</span>
             </button>
@@ -175,7 +100,7 @@
                  DeepSeek is text-only, so attaching an image switches to a
                  vision model automatically. Slugs listed here must exist in
                  MODEL_CAPS in src/services/llmService.js. -->
-            <select id="model-selector" class="model-select" title="Preferred model — Bob auto-switches if it can't handle your input (images, huge docs)">
+            <select id="model-selector" class="model-select" title="Preferred model — Ek Sathi auto-switches if it can't handle your input (images, huge docs)">
               <option value="">Auto (Smart)</option>
               <option value="google/gemini-2.5-flash-lite">Gemini Flash Lite · cheap</option>
               <option value="google/gemini-2.5-flash">Gemini Flash</option>
@@ -189,9 +114,9 @@
         <!-- Messages -->
         <div id="messages-container" class="messages-container">
           <div class="welcome-screen" id="welcome-screen">
-            <img src="/logo.png" class="welcome-cat-logo" alt="Bob" />
-            <h1 id="welcome-title">Hi, I'm Bob</h1>
-            <p id="welcome-sub">Your personal AI assistant with memory. Start a new chat or select one from the sidebar.</p>
+            <div class="welcome-orb">🦉</div>
+            <h1 id="welcome-title">Hi, I'm Ek Sathi</h1>
+            <p id="welcome-sub">Your AI Companion for Learning &amp; Growth. Start a new chat or select one from the sidebar.</p>
             <button id="welcome-new-chat" class="btn-primary">Start New Chat</button>
             <div class="welcome-suggestions" id="welcome-suggestions"></div>
           </div>
@@ -207,7 +132,7 @@
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="12" y1="11" x2="12" y2="17"></line><line x1="9" y1="14" x2="15" y2="14"></line></svg>
             </button>
             <input type="file" id="file-upload-input" multiple style="display:none" accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.tsv,.txt,.md,.json,.xml,.yaml,.yml,.toml,.py,.js,.ts,.jsx,.tsx,.cpp,.c,.java,.cs,.go,.rs,.php,.swift,.kt,.sql,.sh,.bash,.css,.html,.htm,.vue,.rb,.r,.m,.pl,.lua" />
-            <textarea id="message-input" placeholder="Message Bob..." rows="1" maxlength="8000"></textarea>
+            <textarea id="message-input" placeholder="Message Ek Sathi..." rows="1" maxlength="8000"></textarea>
             <button id="send-btn" class="send-btn" disabled>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
             </button>
@@ -277,7 +202,7 @@
               <div id="hack-chat-messages" class="ws-chat-messages">
                 <div class="empty-msg">👈 Left list me se koi hackathon chuno.</div>
               </div>
-              <div class="ws-chat-disabled-hint" id="hack-chat-hint">💬 Kisi hackathon ka naam, link ya details type karo — Bob list me add kar dega! Ya left me se select karo.</div>
+              <div class="ws-chat-disabled-hint" id="hack-chat-hint">💬 Kisi hackathon ka naam, link ya details type karo — Ek Sathi list me add kar dega! Ya left me se select karo.</div>
               <div id="hack-file-preview" class="file-preview hidden"></div>
               <div class="ws-chat-input-row" id="hack-chat-input-row">
                 <label for="hack-file-upload-input" class="attach-btn" title="Attach file">
@@ -490,7 +415,7 @@
           <div class="view-header">
             <div>
               <h2 class="view-title">⏰ Routines — Self-Prompt Engine</h2>
-              <p class="view-sub">Bob khud ko schedule par prompt karega aur workspace chat + notification me output dega.</p>
+              <p class="view-sub">Ek Sathi khud ko schedule par prompt karega aur workspace chat + notification me output dega.</p>
             </div>
             <div class="view-header-actions">
               <button id="add-routine-btn" class="btn-small">＋ New Routine</button>
@@ -530,7 +455,7 @@
           <div class="view-header">
             <div>
               <h2 class="view-title">🔑 Keys Bag & Multi-Queue System</h2>
-              <p class="view-sub">3-Block Dynamic Architecture (Bob Bag · Builder Bag · Gemini Burst Bag) with Queue A ⇄ Queue B daily rotation.</p>
+              <p class="view-sub">3-Block Dynamic Architecture (Ek Sathi Bag · Builder Bag · Gemini Burst Bag) with Queue A ⇄ Queue B daily rotation.</p>
             </div>
             <div class="view-header-actions">
               <button id="keys-refresh-btn" class="btn-small" title="Refresh now">🔄 Refresh</button>
@@ -548,7 +473,7 @@
         <section class="view" id="view-memory">
           <div class="view-header">
             <div>
-              <h2 class="view-title" id="memory-main-title">🧠 Bob's Memory Hub</h2>
+              <h2 class="view-title" id="memory-main-title">🧠 Ek Sathi's Memory Hub</h2>
               <p class="view-sub" id="memory-main-sub">Domain-isolated memory cards & full-page document editor</p>
             </div>
             <div class="view-header-actions">
@@ -907,14 +832,14 @@ https://your-portfolio.com" style="width:100%; padding:8px 12px; border-radius:6
                 <span>🎯</span> Generate Professional ATS Resume
               </h3>
               <p style="font-size: 12px; color: var(--text3); margin-bottom: 10px;">
-                💡 <strong>Completely Free & Flexible:</strong> Agar koi specific job nahi hai, toh neeche ka box khali chhod de — Bob aapke saare best projects, coding stats aur documents ko lekar ek complete Master Technical Resume bana dega. Agar koi target Job Description (JD) hai, toh paste kar de taaki ATS keywords match ho sakein.
+                💡 <strong>Completely Free & Flexible:</strong> Agar koi specific job nahi hai, toh neeche ka box khali chhod de — Ek Sathi aapke saare best projects, coding stats aur documents ko lekar ek complete Master Technical Resume bana dega. Agar koi target Job Description (JD) hai, toh paste kar de taaki ATS keywords match ho sakein.
               </p>
               <textarea id="resume-jd-input" placeholder="(Optional) Paste Target Job Description here if applying for a specific role, or leave blank to build a master resume..." style="width: 100%; height: 75px; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); resize: vertical; font-size: 13px; margin-bottom: 12px; box-sizing: border-box;"></textarea>
 
               <label for="resume-notes-input" style="font-size: 12px; font-weight: 600; color: var(--text2); display: block; margin-bottom: 4px;">
-                📝 Resume Notes / Custom Instructions <span style="font-weight:400; color:var(--text3);">(optional — Bob follow karta hai)</span>
+                📝 Resume Notes / Custom Instructions <span style="font-weight:400; color:var(--text3);">(optional — Ek Sathi follow karta hai)</span>
               </label>
-              <textarea id="resume-notes-input" placeholder="Yahan apni marzi ke instructions likho, Bob resume banate waqt inhe follow karega. Examples:&#10;• 'The Falcon Tour project mera personal nahi hai — maine ye client ke liye freelancing me banaya tha, ise Client Project ke tarah dikhao'&#10;• 'Smart Attendance System hata do aur uski jagah Market Kingdom ko Experienced seat pe rakh do'&#10;• 'Lemma AWS certificate ko Certifications me add kar do'&#10;• 'Summary me 3 line ka overview de ki main AI + Full-Stack ka product builder hoon'" style="width: 100%; height: 110px; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); resize: vertical; font-size: 13px; margin-bottom: 12px; box-sizing: border-box;"></textarea>
+              <textarea id="resume-notes-input" placeholder="Yahan apni marzi ke instructions likho, Ek Sathi resume banate waqt inhe follow karega. Examples:&#10;• 'The Falcon Tour project mera personal nahi hai — maine ye client ke liye freelancing me banaya tha, ise Client Project ke tarah dikhao'&#10;• 'Smart Attendance System hata do aur uski jagah Market Kingdom ko Experienced seat pe rakh do'&#10;• 'Lemma AWS certificate ko Certifications me add kar do'&#10;• 'Summary me 3 line ka overview de ki main AI + Full-Stack ka product builder hoon'" style="width: 100%; height: 110px; padding: 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--text); resize: vertical; font-size: 13px; margin-bottom: 12px; box-sizing: border-box;"></textarea>
               
               <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
                 <button id="resume-generate-btn" class="btn-small btn-accent" style="padding: 10px 20px; font-weight: 600; font-size: 13px;">🚀 Generate Master ATS Resume (PDF)</button>
@@ -1105,7 +1030,7 @@ https://your-portfolio.com" style="width:100%; padding:8px 12px; border-radius:6
             <span style="font-size:22px;">📁</span>
             <div>
               <h3 class="modal-file-name">Select File from Storage</h3>
-              <span class="modal-file-meta">Pick an already uploaded file for Bob to self-read (No re-upload needed)</span>
+              <span class="modal-file-meta">Pick an already uploaded file for Ek Sathi to self-read (No re-upload needed)</span>
             </div>
           </div>
           <button class="icon-btn" id="storage-file-picker-close">✕</button>

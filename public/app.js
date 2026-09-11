@@ -21,174 +21,44 @@ let currentPersona = 'bob'; // 'bob' | 'builder'
 
 // ── DOM refs ─────────────────────────────────────────
 const screens = {
-  login:    document.getElementById('login-screen'),
-  register: document.getElementById('register-screen'),
   app:      document.getElementById('app-screen'),
 };
 
 function showScreen(name) {
-  Object.values(screens).forEach(s => s.classList.remove('active'));
-  screens[name].classList.add('active');
+  Object.values(screens).forEach(s => s && s.classList.remove('active'));
+  screens[name] && screens[name].classList.add('active');
 }
 
-// ── Dynamic Firebase Initialization ──────────────────
-async function initFirebaseApp() {
-  try {
-    const res = await fetch(API + '/api/config');
-    if (!res.ok) throw new Error('Failed to load server configuration');
-    const firebaseConfig = await res.json();
-    
-    if (!firebase.apps.length) {
-      firebase.initializeApp(firebaseConfig);
-    }
-    auth = firebase.auth();
-    
-    auth.onAuthStateChanged(async (user) => {
-      if (user) {
-        await handleAuthUser(user);
-      } else {
-        await handleSignOut();
-      }
-    });
-  } catch (err) {
-    console.error('Firebase config init error:', err);
-    alert('Security / Config Error: Server configuration could not be loaded.');
-  }
-}
+// ── DEV_MODE Auto-Login ─────────────────────────────
+// Backend runs in DEV_MODE (see .env) → requireAuth accepts the
+// literal bearer token "dev-local", so no Firebase login is needed.
+const DEV_USER = {
+  uid: 'dev-local',
+  email: 'dev-local',
+  emailVerified: true,
+  getIdToken: () => Promise.resolve('dev-local'),
+};
 
-// Start initialization on DOM load
-document.addEventListener('DOMContentLoaded', initFirebaseApp);
+// Start app directly (no login/register screens)
+document.addEventListener('DOMContentLoaded', initDevSession);
 
-// ═══════════════════════════════════════════════════════
-// AUTH
-// ═══════════════════════════════════════════════════════
+async function initDevSession() {
+  auth        = null;
+  currentUser = DEV_USER;
+  idToken     = 'dev-local';
 
-// Switch between login / register
-document.getElementById('goto-register').addEventListener('click', e => { e.preventDefault(); showScreen('register'); });
-document.getElementById('goto-login').addEventListener('click',    e => { e.preventDefault(); showScreen('login'); });
-
-// Login
-document.getElementById('login-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const email    = document.getElementById('login-email').value.trim();
-  const password = document.getElementById('login-password').value;
-  const errEl    = document.getElementById('login-error');
-  const btnText  = document.getElementById('login-btn-text');
-  const spinner  = document.getElementById('login-spinner');
-
-  errEl.classList.add('hidden');
-  btnText.classList.add('hidden');
-  spinner.classList.remove('hidden');
-  document.getElementById('login-btn').disabled = true;
-
-  try {
-    await auth.signInWithEmailAndPassword(email, password);
-    // onAuthStateChanged handles the rest
-  } catch (err) {
-    console.error('Login error:', err);
-    errEl.textContent = friendlyAuthError(err.code) || err.message;
-    errEl.classList.remove('hidden');
-  } finally {
-    btnText.classList.remove('hidden');
-    spinner.classList.add('hidden');
-    document.getElementById('login-btn').disabled = false;
-  }
-});
-
-// Register
-document.getElementById('register-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const email    = document.getElementById('reg-email').value.trim();
-  const password = document.getElementById('reg-password').value;
-  const errEl    = document.getElementById('reg-error');
-  const btnText  = document.getElementById('reg-btn-text');
-  const spinner  = document.getElementById('reg-spinner');
-
-  errEl.classList.add('hidden');
-  btnText.classList.add('hidden');
-  spinner.classList.remove('hidden');
-  document.getElementById('reg-btn').disabled = true;
-
-  try {
-    await auth.createUserWithEmailAndPassword(email, password);
-  } catch (err) {
-    errEl.textContent = friendlyAuthError(err.code);
-    errEl.classList.remove('hidden');
-  } finally {
-    btnText.classList.remove('hidden');
-    spinner.classList.add('hidden');
-    document.getElementById('reg-btn').disabled = false;
-  }
-});
-
-// Allowed Google / Login accounts list
-const ALLOWED_EMAILS = [
-  'nikhil2005114@gmail.com',
-  'nikhilrawat42005@gmail.com',
-  'nikhilrawat4112005@gmail.com',
-  'nikhilrawat2005114@gmail.com',
-  'nikhilrawat2005@gmail.com'
-];
-
-// Google Sign-In
-const googleBtn = document.getElementById('google-login-btn');
-if (googleBtn) {
-  googleBtn.addEventListener('click', async () => {
-    const errEl = document.getElementById('login-error');
-    errEl.classList.add('hidden');
-    const provider = new firebase.auth.GoogleAuthProvider();
-    try {
-      await auth.signInWithPopup(provider);
-    } catch (err) {
-      errEl.textContent = friendlyAuthError(err.code) || err.message;
-      errEl.classList.remove('hidden');
-    }
-  });
-}
-
-// Logout
-document.getElementById('logout-btn').addEventListener('click', () => auth.signOut());
-
-// Auth state handler — runs once per auth change (single source of truth)
-async function handleAuthUser(user) {
-  const email = (user.email || '').toLowerCase();
-
-  if (!ALLOWED_EMAILS.includes(email)) {
-    await auth.signOut();
-    const errEl = document.getElementById('login-error');
-    errEl.textContent = `Access Denied: ${email} is not authorized to use Bob.`;
-    errEl.classList.remove('hidden');
-    showScreen('login');
-    return;
-  }
-
-  currentUser = user;
-  idToken     = await user.getIdToken();
-
-  // Mobile App Auth Bridge: if opened from mobile with ?mobile=1, redirect token back to mobile app
-  const urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.get('mobile') === '1') {
-    const customScheme = urlParams.get('redirect') || 'bobmobile://auth';
-    window.location.href = `${customScheme}?token=${encodeURIComponent(idToken)}&email=${encodeURIComponent(email)}`;
-    return;
-  }
-
-  // Refresh token every 50 min (expires at 60)
-  setInterval(async () => { idToken = await user.getIdToken(true); }, 50 * 60 * 1000);
-
-  // Update UI
-  document.getElementById('user-email-label').textContent = email;
-  document.getElementById('user-avatar').textContent      = email[0]?.toUpperCase() || 'U';
+  document.getElementById('user-email-label').textContent = DEV_USER.email;
+  document.getElementById('user-avatar').textContent      = 'E';
 
   showScreen('app');
   await initApp();
 }
 
-async function handleSignOut() {
-  currentUser = null; idToken = null; currentSession = null;
-  stopBackgroundPolling();
-  showScreen('login');
-}
+// Logout — no real session exists, just reset local app state
+document.getElementById('logout-btn').addEventListener('click', () => {
+  localStorage.clear();
+  location.reload();
+});
 
 async function initApp() {
   await loadSessions();
@@ -498,7 +368,7 @@ async function loadMessages(sessionId) {
 
 async function downloadProjectZip(sessionId, projectName) {
   try {
-    const user = auth.currentUser;
+    const user = currentUser;
     const token = user ? await user.getIdToken() : '';
     const res = await fetch(`/api/builder/projects/${sessionId}/zip`, {
       headers: { Authorization: token ? `Bearer ${token}` : '' }
@@ -741,7 +611,7 @@ function createFilespecCard(spec) {
       <div class="file-gen-icon">${meta.icon}</div>
       <div class="file-gen-info">
         <div class="file-gen-name">${escHtml(filename)}</div>
-        <div class="file-gen-meta">${escHtml(meta.label)} &bull; generated by Bob</div>
+        <div class="file-gen-meta">${escHtml(meta.label)} &bull; generated by Ek Sathi</div>
       </div>
     </div>
     <div class="file-gen-actions">
@@ -815,13 +685,13 @@ function createScheduleCard(data) {
     <div class="file-gen-header">
       <div class="file-gen-icon">⏰</div>
       <div class="file-gen-info">
-        <div class="file-gen-name">Scheduled: ${escHtml(data.title || 'Bob Task')}</div>
+        <div class="file-gen-name">Scheduled: ${escHtml(data.title || 'Ek Sathi Task')}</div>
         <div class="file-gen-meta">📅 ${escHtml(formattedTime)} ${data.repeat && data.repeat !== 'none' ? `&bull; Repeat: ${data.repeat}` : ''}</div>
       </div>
     </div>
     <div class="file-gen-actions">
       <div style="font-size: 11.5px; color: var(--text2); flex:1; align-self:center;">
-        Bob will autonomously generate this message and send a notification at the scheduled time!
+        Ek Sathi will autonomously generate this message and send a notification at the scheduled time!
       </div>
     </div>
   `;
@@ -901,7 +771,7 @@ function createChartCard(chartData) {
     return card;
   }
   if (!datasets.length) {
-    card.innerHTML = '<div class="chart-fallback">⚠️ Chart data invalid — Bob ka chart format galat hai.</div>';
+    card.innerHTML = '<div class="chart-fallback">⚠️ Chart data invalid — Ek Sathi ka chart format galat hai.</div>';
     return card;
   }
 
@@ -1356,7 +1226,7 @@ function appendMessage(role, content, animate = true, sender = null, timeStr = n
     // Add Speak Audio Button for Bob's responses
     const speakBtn = document.createElement('button');
     speakBtn.className = 'bubble-speak-btn';
-    speakBtn.title = 'Listen to Bob (Hinglish)';
+    speakBtn.title = 'Listen to Ek Sathi';
     speakBtn.innerHTML = '🔊 Listen';
     speakBtn.addEventListener('click', () => speakHinglishText(content, speakBtn));
     bubble.appendChild(speakBtn);
@@ -1419,8 +1289,8 @@ function createBuilderDelegationCard(data) {
     <div class="file-gen-header">
       <div class="file-gen-icon">🏗️</div>
       <div class="file-gen-info">
-        <div class="file-gen-name">Bob the Builder — ${escHtml(data.title || 'Project')}</div>
-        <div class="file-gen-meta">Bob Builder ko de raha hai…</div>
+        <div class="file-gen-name">Ek Sathi Builder — ${escHtml(data.title || 'Project')}</div>
+        <div class="file-gen-meta">Ek Sathi Builder ko de raha hai…</div>
       </div>
     </div>
     <div class="builder-delegation-body">⏳ Builder se baat ho rahi hai — jawab ka wait karo…</div>
@@ -1437,10 +1307,10 @@ function createBuilderInvalidCard(block) {
       <div class="file-gen-icon">⚠️</div>
       <div class="file-gen-info">
         <div class="file-gen-name">Builder delegation incomplete</div>
-        <div class="file-gen-meta">Bob ka builder block adhoora tha</div>
+        <div class="file-gen-meta">Ek Sathi ka builder block adhoora tha</div>
       </div>
     </div>
-    <div class="builder-delegation-body">❌ ${escHtml(block.error || 'invalid builder block')}. Builder ko kuch nahi bheja gaya. Bob se dobara kahna ki pura 'instruction' ke saath builder block bheje.</div>
+    <div class="builder-delegation-body">❌ ${escHtml(block.error || 'invalid builder block')}. Builder ko kuch nahi bheja gaya. Ek Sathi se dobara kahna ki pura 'instruction' ke saath builder block bheje.</div>
   `;
   return card;
 }
@@ -1585,7 +1455,7 @@ function showTypingIndicator() {
   const row = document.createElement('div');
   row.className = 'message-row assistant';
   row.id = 'typing-row';
-  row.innerHTML = `<div class="message-bubble"><div class="typing-indicator"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="typing-label">Bob is thinking…</span></div></div>`;
+  row.innerHTML = `<div class="message-bubble"><div class="typing-indicator"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="typing-label">Ek Sathi soch raha hai…</span></div></div>`;
   container.appendChild(row);
   scrollToBottom();
 }
@@ -1798,12 +1668,12 @@ function updateWelcomeText() {
   const btn   = document.getElementById('welcome-new-chat');
   if (!title) return;
   if (currentPersona === 'builder') {
-    title.textContent = "Hi, I'm Bob the Builder";
+    title.textContent = "Hi, I'm the Builder";
     sub.textContent = 'Your Principal Software Architect & Tech Co-Founder. Discuss tech stacks, color palettes, database schemas & architecture. Jab ready ho, tab final code files generate hongi.';
     if (btn) btn.textContent = 'Start New Project';
   } else {
-    title.textContent = "Hi, I'm Bob";
-    sub.textContent = 'Your personal AI assistant with memory. Start a new chat or select one from the sidebar.';
+    title.textContent = "Hi, I'm Ek Sathi";
+    sub.textContent = 'Your AI Companion for Learning & Growth. Start a new chat or select one from the sidebar.';
     if (btn) btn.textContent = 'Start New Chat';
   }
 }
@@ -1812,9 +1682,9 @@ function showWelcome() {
   const c = document.getElementById('messages-container');
   c.innerHTML = `
     <div class="welcome-screen" id="welcome-screen">
-      <img src="/logo.png" class="welcome-cat-logo" alt="Bob" />
-      <h1 id="welcome-title">Hi, I'm Bob</h1>
-      <p id="welcome-sub">Your personal AI assistant with memory. Start a new chat or select one from the sidebar.</p>
+      <div class="welcome-orb">🦉</div>
+      <h1 id="welcome-title">Hi, I'm Ek Sathi</h1>
+      <p id="welcome-sub">Your AI Companion for Learning & Growth. Start a new chat or select one from the sidebar.</p>
       <button id="welcome-new-chat" class="btn-primary">Start New Chat</button>
       <div class="welcome-suggestions" id="welcome-suggestions"></div>
     </div>
@@ -1836,8 +1706,8 @@ function setPersona(p) {
   document.getElementById('chat-session-title').textContent = p === 'builder' ? 'Select a project' : 'Select a chat';
   document.getElementById('sidebar-session-label').textContent = p === 'builder' ? 'Builder Projects' : 'Chats';
   messageInput.placeholder = p === 'builder'
-    ? 'Apna project describe karo — Bob the Builder architect + prompt pack banayega...'
-    : 'Message Bob...';
+    ? 'Apna project describe karo — Builder architect + prompt pack banayega...'
+    : 'Message Ek Sathi...';
   showWelcome();
   loadSessions();
   if (p === 'bob') {
@@ -2004,7 +1874,7 @@ async function sendMessage() {
       if (selEl) {
         selEl.title = shifted
           ? `Auto-switched to ${data.model} — ${data.routing.join(' | ')}`
-          : `Preferred model — Bob auto-switches if it can't handle your input (images, huge docs). Last used: ${data.model}`;
+          : `Preferred model — Ek Sathi auto-switches if it can't handle your input (images, huge docs). Last used: ${data.model}`;
       }
       if (shifted) console.info('[Bob] model auto-switched →', data.model, data.routing);
     }
@@ -2485,7 +2355,7 @@ async function loadMonthlyFiles() {
     list.innerHTML = files.map(f => `
       <div class="weekly-file-item">
         <div class="weekly-file-info">
-          <div class="weekly-file-name">${escHtml(f.filename || ('Bob-Memory-' + f.id + '.md'))}</div>
+          <div class="weekly-file-name">${escHtml(f.filename || ('Ek-Sathi-Memory-' + f.id + '.md'))}</div>
           <div class="weekly-file-meta">${escHtml(f.id)} · ${new Date(f.createdAt).toLocaleDateString()}</div>
         </div>
         <button class="weekly-file-dl" data-id="${escHtml(f.id)}">⬇ Download</button>
@@ -2507,7 +2377,7 @@ async function downloadMonthlyFile(monthId) {
     if (!res.ok) throw new Error('Download failed');
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
-    triggerDownload(url, `Bob-Memory-${monthId}.md`, 2000);
+    triggerDownload(url, `Ek-Sathi-Memory-${monthId}.md`, 2000);
   } catch (err) {
     alert('Failed to download: ' + err.message);
   }
@@ -3862,7 +3732,7 @@ function renderFilesGrid() {
  * silently refreshes it when it is not, so this is cheap.
  */
 async function freshIdToken() {
-  const user = (auth && auth.currentUser) ? auth.currentUser : currentUser;
+  const user = currentUser;
   if (!user) throw new Error('You are signed out. Please sign in again.');
   const token = await user.getIdToken();
   // Keep the shared variable in sync so other callers benefit too.
@@ -3916,7 +3786,7 @@ function openFilePreviewModal(file) {
 
   if (statusEl) {
     if (file.textExtracted) {
-      statusEl.textContent = `✅ Text content extracted & accessible in Bob's AI memory`;
+      statusEl.textContent = `✅ Text content extracted & accessible in Ek Sathi's AI memory`;
       statusEl.style.color = 'var(--green)';
     } else {
       statusEl.textContent = `ℹ️ Binary / Media asset`;
@@ -4000,7 +3870,7 @@ if (modalDeleteBtn) {
 
 // ── Delete File Handler ──────────────────────────────────
 async function deleteUploadedFile(fileId, fileName) {
-  if (!confirm(`Are you sure you want to delete "${fileName}"?\nThis will remove it from Bob's storage permanently.`)) {
+  if (!confirm(`Are you sure you want to delete "${fileName}"?\nThis will remove it from Ek Sathi's storage permanently.`)) {
     return;
   }
   try {
@@ -4275,7 +4145,7 @@ async function loadVaultChat() {
     }
     container.innerHTML = messages.map(m => `
       <div class="vault-msg-bubble ${m.role}">
-        <div class="vault-msg-role">${m.role === 'user' ? 'Nikhil' : 'Bob (Private)'}</div>
+        <div class="vault-msg-role">${m.role === 'user' ? 'Nikhil' : 'Ek Sathi (Private)'}</div>
         <div class="vault-msg-text">${escHtml(m.content)}</div>
       </div>
     `).join('');
@@ -4313,7 +4183,7 @@ async function sendVaultMessage() {
 
     const botDiv = document.createElement('div');
     botDiv.className = 'vault-msg-bubble assistant';
-    botDiv.innerHTML = `<div class="vault-msg-role">Bob (Private)</div><div class="vault-msg-text">${escHtml(data.reply)}</div>`;
+    botDiv.innerHTML = `<div class="vault-msg-role">Ek Sathi (Private)</div><div class="vault-msg-text">${escHtml(data.reply)}</div>`;
     container.appendChild(botDiv);
     container.scrollTop = container.scrollHeight;
   } catch (err) {
@@ -4377,7 +4247,7 @@ async function loadHQSummary() {
     return;
   }
 
-  if (titleEl) titleEl.textContent = '🏠 Bob HQ';
+  if (titleEl) titleEl.textContent = '🏠 Ek Sathi HQ';
   if (subEl) subEl.textContent = 'Interconnected headquarters — saare modules ek nazar me, har ek ka apna alag mind.';
 
   grid.innerHTML = '<div class="empty-msg">Loading HQ…</div>';
@@ -4514,7 +4384,7 @@ function renderHackList() {
     list.innerHTML = `
       <div class="empty-msg">
         <p>🏆 No hackathons yet.</p>
-        <p style="font-size:12px; opacity:0.8; margin-top:4px;">Main Bob chat me hackathon details paste karo ya "＋ Add Hackathon" button use karo!</p>
+        <p style="font-size:12px; opacity:0.8; margin-top:4px;">Main Ek Sathi chat me hackathon details paste karo ya "＋ Add Hackathon" button use karo!</p>
       </div>`;
     return;
   }
@@ -4552,7 +4422,7 @@ function renderHackList() {
           <span class="ws-item-sub">${escHtml(h.source || 'manual')}${h.prize ? ' · 💰 ' + escHtml(h.prize) : ''}</span>
         </div>
         <div class="ws-item-actions">
-          <label class="ws-toggle" title="Participating → Bob AI Chat Context">
+          <label class="ws-toggle" title="Participating → Ek Sathi AI Chat Context">
             <input type="checkbox" ${h.participating ? 'checked' : ''} data-act="participating" /> <span>🟢 Participate</span>
           </label>
           <label class="ws-toggle" title="Auto-track routine">
@@ -4624,7 +4494,7 @@ async function selectHack(id) {
 
 function resetHackChat() {
   document.getElementById('hack-chat-header').innerHTML = '<span>Select a hackathon or describe a new one below</span>';
-  document.getElementById('hack-chat-messages').innerHTML = '<div class="empty-msg">💬 Koi hackathon describe karo — Bob list me add kar dega. Ya left me se select karo.</div>';
+  document.getElementById('hack-chat-messages').innerHTML = '<div class="empty-msg">💬 Koi hackathon describe karo — Ek Sathi list me add kar dega. Ya left me se select karo.</div>';
   document.getElementById('hack-chat-input').disabled = false;
   document.getElementById('hack-chat-input').placeholder = 'Hackathon describe karo ya left me se select karo…';
   document.getElementById('hack-send-btn').disabled = false;
@@ -4637,7 +4507,7 @@ function resetHackChat() {
 document.getElementById('paste-hack-btn')?.addEventListener('click', () => {
   openModal('📋 Paste Hackathon Announcement / Info', `
     <div class="modal-form">
-      <p style="font-size:12px; color:var(--text2); margin:0;">WhatsApp, LinkedIn ya website se poora hackathon text paste karo — Bob khud dates, prizes, rules parse kar lega!</p>
+      <p style="font-size:12px; color:var(--text2); margin:0;">WhatsApp, LinkedIn ya website se poora hackathon text paste karo — Ek Sathi khud dates, prizes, rules parse kar lega!</p>
       <textarea id="paste-hack-text" rows="8" placeholder="Example:\n🚀 ViCodathon 2026 – India's AI-First Vibe Coding Hackathon\n🏆 Prize Pool up to ₹20,000\n📅 Deadline: 6 August 2026\n🔗 Register Now: https://www.abtalks.in/..."></textarea>
       <button id="paste-hack-submit" class="btn-primary" style="width:100%;">⚡ Auto-Parse & Add Hackathon</button>
     </div>
@@ -4725,7 +4595,7 @@ function renderHackKnowledge(h) {
     const hackId = h.id;
     openModal('📋 Paste Announcement → Update Knowledge', `
       <div class="modal-form">
-        <p style="font-size:12px;color:var(--text2);margin:0 0 8px;">WhatsApp / LinkedIn / website se hackathon announcement paste karo — Bob knowledge panel update kar dega bina scraping ke!</p>
+        <p style="font-size:12px;color:var(--text2);margin:0 0 8px;">WhatsApp / LinkedIn / website se hackathon announcement paste karo — Ek Sathi knowledge panel update kar dega bina scraping ke!</p>
         <textarea id="paste-kb-text" rows="8" placeholder="🚀 ViCodathon 2026...&#10;Prize ₹20,000&#10;Aug 7-9 2026..."></textarea>
         <button id="paste-kb-submit" class="btn-primary" style="width:100%;">⚡ Update Knowledge</button>
       </div>
@@ -4791,7 +4661,7 @@ async function sendHackMessage() {
     // No hackathon selected → parse text with AI, then create in DB, then select
     const loadingMsg = document.createElement('div');
     loadingMsg.className = 'ws-msg assistant';
-    loadingMsg.innerHTML = '<div class="ws-msg-role">Bob 🏆</div><div class="ws-msg-text">⏳ Hackathon details parse kar raha hu…</div>';
+    loadingMsg.innerHTML = '<div class="ws-msg-role">Ek Sathi 🏆</div><div class="ws-msg-text">⏳ Hackathon details parse kar raha hu…</div>';
     el.appendChild(loadingMsg); el.scrollTop = el.scrollHeight;
     try {
       // Step 1: AI extracts structured fields from raw text
@@ -4817,10 +4687,10 @@ async function sendHackMessage() {
       el.removeChild(loadingMsg);
       await loadHackathons();
       await selectHack(String(hackathon.id));
-      appendWsMsg(el, 'assistant', 'Bob 🏆', `✅ "${hackathon.title}" list me add ho gaya! Ab tum directly iske baare me chat kar sakte ho. Left me dikhe ga.\n\n📅 Dates: ${hackathon.startDate ? new Date(hackathon.startDate).toLocaleDateString() : '?'} → ${hackathon.endDate ? new Date(hackathon.endDate).toLocaleDateString() : '?'}\n💰 Prize: ${hackathon.prize || '—'}`);
+      appendWsMsg(el, 'assistant', 'Ek Sathi 🏆', `✅ "${hackathon.title}" list me add ho gaya! Ab tum directly iske baare me chat kar sakte ho. Left me dikhe ga.\n\n📅 Dates: ${hackathon.startDate ? new Date(hackathon.startDate).toLocaleDateString() : '?'} → ${hackathon.endDate ? new Date(hackathon.endDate).toLocaleDateString() : '?'}\n💰 Prize: ${hackathon.prize || '—'}`);
     } catch (err) {
       try { el.removeChild(loadingMsg); } catch(_) {}
-      appendWsMsg(el, 'assistant', 'Bob 🏆', '⚠️ ' + err.message);
+      appendWsMsg(el, 'assistant', 'Ek Sathi 🏆', '⚠️ ' + err.message);
     }
     input.disabled = false; input.focus();
     return;
@@ -4829,13 +4699,13 @@ async function sendHackMessage() {
   // Hackathon selected → normal workspace chat
   const loadingMsg = document.createElement('div');
   loadingMsg.className = 'ws-msg assistant';
-  loadingMsg.innerHTML = '<div class="ws-msg-role">Bob 🏆</div><div class="ws-msg-text">⏳ Thinking…</div>';
+  loadingMsg.innerHTML = '<div class="ws-msg-role">Ek Sathi 🏆</div><div class="ws-msg-text">⏳ Thinking…</div>';
   el.appendChild(loadingMsg); el.scrollTop = el.scrollHeight;
 
   try {
     const data = await apiFetch(`/api/hackathons/${currentHack.id}/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: text }) });
     try { el.removeChild(loadingMsg); } catch(_) {}
-    appendWsMsg(el, 'assistant', 'Bob 🏆', data.reply);
+    appendWsMsg(el, 'assistant', 'Ek Sathi 🏆', data.reply);
 
     // ── Knowledge auto-updated from pasted announcement ──────────────
     if (data.knowledgeUpdated) {
@@ -4856,7 +4726,7 @@ async function sendHackMessage() {
     }
   } catch (err) {
     try { el.removeChild(loadingMsg); } catch(_) {}
-    appendWsMsg(el, 'assistant', 'Bob 🏆', '⚠️ ' + err.message);
+    appendWsMsg(el, 'assistant', 'Ek Sathi 🏆', '⚠️ ' + err.message);
   }
   input.disabled = false; input.focus();
 }
@@ -5154,13 +5024,13 @@ function renderSeoAudit(site) {
       <!-- ✨ Level 4: Token-Optimized AI Action Plan -->
       <div class="ws-kb-block" style="background: linear-gradient(135deg, rgba(var(--accent-rgb),0.1), rgba(0,0,0,0.3)); border: 1px solid rgba(var(--accent-rgb),0.25); border-radius: 8px; padding: 12px;">
         <div style="display:flex;justify-content:space-between;align-items:center;">
-          <span style="font-weight:700;font-size:12px;color:var(--text1);">✨ Bob AI Master Plan</span>
+          <span style="font-weight:700;font-size:12px;color:var(--text1);">✨ Ek Sathi AI Master Plan</span>
           ${(a.aiActionPlan) ? '<span style="font-size:10px;color:var(--green);font-weight:700;padding:2px 6px;border-radius:4px;background:rgba(52,211,153,0.12);">✓ Ready in Chat</span>' : ''}
         </div>
         <div style="font-size:11px;color:var(--text2);margin-zero:6px 0 10px;line-height:1.45;">
           ${(a.aiActionPlan) 
             ? 'Pura roadmap niche preview hai — chat section mein bhi available. Re-generate for fresh plan.' 
-            : 'Master Bob website ke saare pages, Core Web Vitals aur vulnerabilities ko analyze karke action plan dega.'}
+            : 'Master Ek Sathi website ke saare pages, Core Web Vitals aur vulnerabilities ko analyze karke action plan dega.'}
         </div>
         ${(a.aiActionPlan && a.aiActionPlan.text)
           ? `<div class="md-content" style="max-height:230px;overflow-y:auto;margin-bottom:10px;font-size:11.5px;color:var(--text1);line-height:1.55;background:rgba(0,0,0,0.28);border:1px solid rgba(var(--accent-rgb),0.2);border-radius:6px;padding:10px 12px;">${renderTextContent(a.aiActionPlan.text)}</div>`
@@ -6120,28 +5990,28 @@ async function sendSeoMessage() {
   appendWsMsg(el, 'user', 'Nikhil', text);
 
   if (!currentSeoSite) {
-    appendWsMsg(el, 'assistant', 'Bob 🔍', '⏳ Website audit + chat setup ho raha hai…');
+    appendWsMsg(el, 'assistant', 'Ek Sathi 🔍', '⏳ Website audit + chat setup ho raha hai…');
     try {
       const { site } = await apiFetch('/api/seo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: text }) });
       el.querySelector('.ws-msg.assistant:last-of-type')?.remove();
       seoSitesCache.unshift(site);
       renderSeoList();
       await selectSeo(site.id);
-      appendWsMsg(el, 'assistant', 'Bob 🔍', `✅ "${site.domain}" ka audit complete! Score: ${typeof site.lastScore === 'number' ? site.lastScore + '/100' : '—'} — right side panel me details milegi.`);
+      appendWsMsg(el, 'assistant', 'Ek Sathi 🔍', `✅ "${site.domain}" ka audit complete! Score: ${typeof site.lastScore === 'number' ? site.lastScore + '/100' : '—'} — right side panel me details milegi.`);
     } catch (err) {
       const last = el.querySelector('.ws-msg.assistant:last-of-type');
-      if (last) last.innerHTML = wsMsgHTML('assistant', 'Bob 🔍', '⚠️ ' + err.message);
+      if (last) last.innerHTML = wsMsgHTML('assistant', 'Ek Sathi 🔍', '⚠️ ' + err.message);
     }
   } else {
-    appendWsMsg(el, 'assistant', 'Bob 🔍', '⏳ Thinking…');
+    appendWsMsg(el, 'assistant', 'Ek Sathi 🔍', '⏳ Thinking…');
     try {
       const data = await apiFetch('/api/seo/' + currentSeoSite.id + '/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: text }) });
       const last = el.querySelector('.ws-msg.assistant:last-of-type');
       if (last) last.remove();
-      appendWsMsg(el, 'assistant', 'Bob 🔍', data.reply || '…');
+      appendWsMsg(el, 'assistant', 'Ek Sathi 🔍', data.reply || '…');
     } catch (err) {
       const last = el.querySelector('.ws-msg.assistant:last-of-type');
-      if (last) last.innerHTML = wsMsgHTML('assistant', 'Bob 🔍', '⚠️ ' + err.message);
+      if (last) last.innerHTML = wsMsgHTML('assistant', 'Ek Sathi 🔍', '⚠️ ' + err.message);
     }
   }
   input.focus();
@@ -6461,7 +6331,7 @@ async function sendStalkMessage() {
     // No profile selected → treat as "add new person" via description
     const loadingMsg = document.createElement('div');
     loadingMsg.className = 'ws-msg assistant';
-    loadingMsg.innerHTML = '<div class="ws-msg-role">Bob 🔎</div><div class="ws-msg-text">⏳ Profile create kar raha hu…</div>';
+    loadingMsg.innerHTML = '<div class="ws-msg-role">Ek Sathi 🔎</div><div class="ws-msg-text">⏳ Profile create kar raha hu…</div>';
     el.appendChild(loadingMsg); el.scrollTop = el.scrollHeight;
     try {
       const urlMatch = text.match(/https?:\/\/[^\s]+/);
@@ -6471,10 +6341,10 @@ async function sendStalkMessage() {
       el.removeChild(loadingMsg);
       await loadStalking();
       await selectStalk(String(profile.id));
-      appendWsMsg(el, 'assistant', 'Bob 🔎', `✅ "${profile.name}" profile list me add ho gaya! Research background me chal raha hai. Ab tum directly iske baare me chat kar sakte ho.`);
+      appendWsMsg(el, 'assistant', 'Ek Sathi 🔎', `✅ "${profile.name}" profile list me add ho gaya! Research background me chal raha hai. Ab tum directly iske baare me chat kar sakte ho.`);
     } catch (err) {
       try { el.removeChild(loadingMsg); } catch(_) {}
-      appendWsMsg(el, 'assistant', 'Bob 🔎', '⚠️ ' + err.message + '\n\nTip: Name aur LinkedIn/GitHub URL dena zaroori hai, jaise: "Rahul Sharma - https://linkedin.com/in/rahul"');
+      appendWsMsg(el, 'assistant', 'Ek Sathi 🔎', '⚠️ ' + err.message + '\n\nTip: Name aur LinkedIn/GitHub URL dena zaroori hai, jaise: "Rahul Sharma - https://linkedin.com/in/rahul"');
     }
     input.disabled = false; input.focus();
     return;
@@ -6483,7 +6353,7 @@ async function sendStalkMessage() {
   // Profile selected → normal workspace chat
   try {
     const data = await apiFetch(`/api/stalking/${currentStalk.id}/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: text }) });
-    appendWsMsg(el, 'assistant', 'Bob 🔎', data.reply);
+    appendWsMsg(el, 'assistant', 'Ek Sathi 🔎', data.reply);
 
     if (data.action === 'data_updated' && data.updatedProfile) {
       currentStalk = data.updatedProfile;
@@ -6503,7 +6373,7 @@ async function sendStalkMessage() {
         }
       }, 8000);
     }
-  } catch (err) { appendWsMsg(el, 'assistant', 'Bob 🔎', '⚠️ ' + err.message); }
+  } catch (err) { appendWsMsg(el, 'assistant', 'Ek Sathi 🔎', '⚠️ ' + err.message); }
   input.disabled = false; input.focus();
 }
 
@@ -6567,7 +6437,7 @@ async function loadRoutines() {
           <span class="routine-ws" style="background: rgba(139, 92, 246, 0.2); color: #c084fc;">AUTONOMOUS CYCLE</span>
         </div>
         <div class="routine-prompt" style="color: var(--text2);">
-          Ye schedule Bob backend me autonomously active rehta hai. Har 4 din ke gap me Devpost, Unstop aur Devfolio se naye CSE hackathons automatically scan karke radar me populate karta hai.
+          Ye schedule Ek Sathi backend me autonomously active rehta hai. Har 4 din ke gap me Devpost, Unstop aur Devfolio se naye CSE hackathons automatically scan karke radar me populate karta hai.
         </div>
         <div class="routine-meta" style="color: #38bdf8; font-weight: 600;">
           Status: <span style="color: ${isPaused ? '#f59e0b' : '#4ade80'};">${isPaused ? '⏸ PAUSED' : '🟢 ACTIVE (Running every 4 days)'}</span> · Next Auto-Scan: <span style="color: #facc15;">${nextScanStr}</span>
@@ -6579,7 +6449,7 @@ async function loadRoutines() {
     `;
 
     if (!routines.length) {
-      grid.innerHTML = radarAckCard + '<div class="empty-msg">No custom user routines yet. Ek routine banao — Bob khud prompt karega aur workspace me output dega.</div>';
+      grid.innerHTML = radarAckCard + '<div class="empty-msg">No custom user routines yet. Ek routine banao — Ek Sathi khud prompt karega aur workspace me output dega.</div>';
       return;
     }
 
@@ -6614,7 +6484,7 @@ document.getElementById('add-routine-btn').addEventListener('click', () => {
   openModal('⏰ New Routine', `
     <div class="modal-form">
       <label>Title *<input id="rt-title" type="text" placeholder="Secret Vault Review" /></label>
-      <label>Prompt (Bob khud ye krega) *<textarea id="rt-prompt" rows="4" placeholder="Secret vault me kya-changes hain, kya batana hai…"></textarea></label>
+      <label>Prompt (Ek Sathi khud ye krega) *<textarea id="rt-prompt" rows="4" placeholder="Secret vault me kya-changes hain, kya batana hai…"></textarea></label>
       <div class="modal-row">
         <label>Interval (hours)<input id="rt-interval" type="number" value="72" min="1" /></label>
         <label>Workspace
@@ -6624,7 +6494,7 @@ document.getElementById('add-routine-btn').addEventListener('click', () => {
             <option value="stalking">🔎 Deep Research</option>
             <option value="market">📈 Market</option>
             <option value="habit">📝 Habit</option>
-            <option value="bob">🧠 Bob</option>
+            <option value="bob">🧠 Ek Sathi</option>
             <option value="custom">✨ Custom</option>
           </select>
         </label>
@@ -6729,7 +6599,7 @@ function renderLiveRadar() {
           <div style="font-size: 40px; margin-bottom: 12px;">🛰️</div>
           <div style="font-weight: 800; font-size: 18px; color: var(--text);">No Hackathons in Discovery Radar</div>
           <div style="font-size: 13px; color: var(--text2); max-width: 460px; margin: 8px auto 20px; line-height: 1.5;">
-            Bob automatically crawls Devpost, Unstop and Devfolio every 4 days. Click below to trigger an immediate live scan right now!
+            Ek Sathi automatically crawls Devpost, Unstop and Devfolio every 4 days. Click below to trigger an immediate live scan right now!
           </div>
           <button id="live-empty-scan-btn" class="btn-primary" style="padding: 10px 24px; font-size: 14px; font-weight: 800; box-shadow: 0 4px 15px rgba(56, 189, 248, 0.35);">
             🔍 Scan Hackathons Now
@@ -6921,7 +6791,7 @@ document.getElementById('live-toggle-btn')?.addEventListener('click', async (e) 
 // ── Shared workspace chat helpers ─────────────────────
 function renderWsChat(el, messages, tag) {
   if (!messages || !messages.length) { el.innerHTML = '<div class="empty-msg">Is workspace me abhi koi baat nahi hui. Pehla message bhejo — context totally isolated hai.</div>'; return; }
-  el.innerHTML = messages.map(m => wsMsgHTML(m.role, m.role === 'user' ? 'Nikhil' : (tag === 'hack' ? 'Bob 🏆' : tag === 'seo' ? 'Bob 🔍' : 'Bob 🔎'), m.content)).join('');
+  el.innerHTML = messages.map(m => wsMsgHTML(m.role, m.role === 'user' ? 'Nikhil' : (tag === 'hack' ? 'Ek Sathi 🏆' : tag === 'seo' ? 'Ek Sathi 🔍' : 'Ek Sathi 🔎'), m.content)).join('');
   el.scrollTop = el.scrollHeight;
 }
 function wsMsgHTML(role, author, text) { return `<div class="ws-msg ${role}"><div class="ws-msg-role">${escHtml(author)}</div><div class="ws-msg-text">${renderTextContent(text)}</div></div>`; }
@@ -7504,7 +7374,7 @@ document.getElementById('resume-base-input')?.addEventListener('change', async (
   formData.append('profileId', activeCandidateProfileId);
 
   try {
-    const token = await auth.currentUser.getIdToken();
+    const token = await currentUser.getIdToken();
     const res = await fetch(API + `/api/resume/upload/base?profileId=${encodeURIComponent(activeCandidateProfileId)}`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
@@ -7531,7 +7401,7 @@ document.getElementById('resume-cert-input')?.addEventListener('change', async (
   formData.append('profileId', activeCandidateProfileId);
 
   try {
-    const token = await auth.currentUser.getIdToken();
+    const token = await currentUser.getIdToken();
     const res = await fetch(API + `/api/resume/upload/documents?profileId=${encodeURIComponent(activeCandidateProfileId)}`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}` },
@@ -7788,7 +7658,7 @@ document.getElementById('resume-pdf-download-btn')?.addEventListener('click', as
   btn.disabled = true;
 
   try {
-    const token = await auth.currentUser.getIdToken();
+    const token = await currentUser.getIdToken();
     const res = await fetch(API + '/api/resume/download-direct-pdf', {
       method: 'POST',
       headers: {
@@ -7897,7 +7767,7 @@ document.getElementById('resume-analyzer-run-btn')?.addEventListener('click', as
   if (spinner) spinner.style.display = 'block';
 
   try {
-    const token = await auth.currentUser.getIdToken();
+    const token = await currentUser.getIdToken();
     const jd = document.getElementById('resume-jd-input')?.value.trim() || '';
     const formData = new FormData();
     if (selectedAnalyzerFile) {
@@ -7946,7 +7816,7 @@ document.getElementById('resume-download-audit-pdf-btn')?.addEventListener('clic
   btn.disabled = true;
 
   try {
-    const token = await auth.currentUser.getIdToken();
+    const token = await currentUser.getIdToken();
     const res = await fetch(API + '/api/resume/download-audit-pdf', {
       method: 'POST',
       headers: {
