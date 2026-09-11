@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════
    EK SATHI — AI Companion for Learning & Growth
-   Frontend app (v5): Chat + Hackathon Lab + GitHub/Website Study
+   Frontend app (v7): Chat + Hackathon/Internship Discovery + Study
    Frontend is 100% localhost; all auth is local (Bearer dev-local).
    ═══════════════════════════════════════════════════════════ */
 'use strict';
@@ -11,10 +11,8 @@ const TOKEN = 'dev-local';    // local-only auth token
 /* ── State ─────────────────────────────────────────────── */
 let currentSessionId = null;
 let sessions = [];
-let hackathons = [];
-let currentHackId = null;
+let discoverCards = [];
 let attachedFiles = [];       // [{ id, name, size }] to attach to next chat msg
-let voiceEnabled = localStorage.getItem('tts_enabled') !== '0';
 
 const $ = (id) => document.getElementById(id);
 const escHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -33,8 +31,7 @@ async function apiFetch(url, opts = {}) {
 function showView(view) {
   document.querySelectorAll('.view').forEach((v) => v.classList.toggle('active', v.id === `view-${view}`));
   document.querySelectorAll('.nav-btn').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
-  if (view === 'hackathon') loadHackathons();
-  if (view === 'study') { /* study is lazy */ }
+  if (view === 'hackathon') loadDiscoverCards();
 }
 
 /* ── Sessions ──────────────────────────────────────────── */
@@ -102,7 +99,6 @@ async function switchSession(id) {
 function resetChatUI() {
   currentSessionId = null;
   $('chat-session-title').textContent = 'New Chat';
-  $('messages-container').innerHTML = '';
   const welcome = `
     <div id="welcome-screen" class="welcome-screen">
       <div class="welcome-orb">🦉</div>
@@ -150,15 +146,14 @@ function appendMessage(role, text, container) {
 
 function renderMessages(messages) {
   const c = $('messages-container');
-  c.innerHTML = '';
   if (!messages?.length) { resetChatUI(); return; }
+  c.innerHTML = '';
   messages.forEach((m) => appendMessage(m.role, m.content, c));
 }
 
 /* Render advanced blocks (charts & mermaid) inside a message bubble */
 function enhanceRenderedBubbles(root) {
   root.querySelectorAll('.message-bubble').forEach((bubble) => {
-    // mermaid
     bubble.querySelectorAll('pre.language-mermaid, code.language-mermaid').forEach((node) => {
       const pre = node.closest('pre') || node;
       pre.className = 'mermaid-src';
@@ -171,7 +166,6 @@ function enhanceRenderedBubbles(root) {
         if (window.mermaid) mermaid.run({ nodes: [wrapper] }).catch(() => {});
       } catch (e) {}
     });
-    // charts (```chart {json})
     bubble.querySelectorAll('pre.language-chart').forEach((pre) => {
       try {
         const cfg = JSON.parse(pre.textContent);
@@ -253,6 +247,7 @@ async function sendMessage() {
   if (!text) return;
   input.value = '';
   input.style.height = 'auto';
+  $('send-btn').disabled = true;
   if (!currentSessionId) currentSessionId = await createSession();
   const docs = attachedFiles.map((f) => ({ id: f.id, name: f.name }));
   appendMessage('user', text);
@@ -273,33 +268,13 @@ async function sendMessage() {
       renderSessions();
     }
     appendMessage('assistant', data.reply || '…');
-    if (voiceEnabled && data.reply) speak(data.reply);
   } catch (err) {
     typing.remove();
     appendMessage('assistant', '⚠️ ' + (err.message || 'Something went wrong.'));
+  } finally {
+    $('send-btn').disabled = false;
+    $('message-input').focus();
   }
-}
-
-/* ── TTS ───────────────────────────────────────────────── */
-function speak(text) {
-  if (!('speechSynthesis' in window)) return;
-  window.speechSynthesis.cancel();
-  const clean = String(text).replace(/[#*`>\-]/g, ' ').slice(0, 400);
-  const u = new SpeechSynthesisUtterance(clean);
-  u.lang = 'en-IN';
-  window.speechSynthesis.speak(u);
-}
-function initTTS() {
-  const btn = $('tts-toggle-btn');
-  btn.textContent = voiceEnabled ? '🔊 Voice' : '🔇 Voice';
-  if (voiceEnabled) btn.classList.add('on');
-  else btn.classList.remove('on');
-  btn.addEventListener('click', () => {
-    voiceEnabled = !voiceEnabled;
-    localStorage.setItem('tts_enabled', voiceEnabled ? '1' : '0');
-    btn.textContent = voiceEnabled ? '🔊 Voice' : '🔇 Voice';
-    if (voiceEnabled) { btn.classList.add('on'); } else { btn.classList.remove('on'); window.speechSynthesis.cancel(); }
-  });
 }
 
 /* ── Welcome chips ─────────────────────────────────────── */
@@ -311,213 +286,135 @@ function bindWelcomeChips() {
   }));
 }
 
-/* ── Hackathon ─────────────────────────────────────────── */
-async function loadHackathons() {
-  try {
-    const data = await apiFetch('/api/hackathons');
-    hackathons = data.hackathons || [];
-    renderHackathons();
-  } catch (err) { console.error(err); }
+/* ── Discovery: Hackathon Lab ──────────────────────────── */
+const DISCOVER_STATUS = $('scan-status');
+
+function setScanStatus(text, busy) {
+  if (!DISCOVER_STATUS) return;
+  DISCOVER_STATUS.textContent = text;
+  DISCOVER_STATUS.classList.toggle('busy', !!busy);
 }
 
-function renderHackathons() {
-  const list = $('hack-list');
-  if (!hackathons.length) {
-    list.innerHTML = '<div class="empty-msg" style="padding:20px;text-align:center;color:var(--text3)">Koi hackathon nahi hai. "＋ Add" se add karo.</div>';
+async function loadDiscoverCards() {
+  try {
+    const data = await apiFetch('/api/hackathons/discover');
+    discoverCards = data.cards || [];
+    const meta = data.meta || {};
+    if (meta.nextRunAt) {
+      setScanStatus(`📥 ${discoverCards.length} live candidates · next auto-scan ${new Date(meta.nextRunAt).toLocaleString()}`, false);
+    } else {
+      setScanStatus(`📥 ${discoverCards.length} live candidates`, false);
+    }
+    renderDiscoverGrid();
+  } catch (err) {
+    console.error(err);
+    setScanStatus('⚠️ ' + err.message, false);
+    $('discover-grid').innerHTML = `<div class="d-card-empty">Could not load discoveries.</div>`;
+  }
+}
+
+async function scanNow() {
+  const btn = $('hack-scan-btn');
+  btn.disabled = true;
+  setScanStatus('⏳ Scraping Devpost · Unstop · Devfolio · HackerEarth · MLH · Internshala…', true);
+  try {
+    const data = await apiFetch('/api/hackathons/discover/run', { method: 'POST' });
+    if (data.paused) {
+      setScanStatus('⏸ Discovery is paused.', false);
+    } else if (data.skipped) {
+      setScanStatus(`⏳ Already scanned · next at ${new Date(data.nextRunAt).toLocaleString()}`, false);
+    } else {
+      setScanStatus(`✅ +${data.added} new live opportunities · next at ${new Date(data.nextRunAt).toLocaleString()}`, false);
+    }
+    await loadDiscoverCards();
+  } catch (err) {
+    setScanStatus('⚠️ ' + err.message, false);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function filteredCards() {
+  const q = ($('discover-filter').value || '').trim().toLowerCase();
+  const src = $('discover-source-filter').value;
+  const type = $('discover-type-filter').value;
+  return discoverCards.filter((c) => {
+    if (src && c.platform !== src) return false;
+    if (type && (c.type || 'hackathon') !== type) return false;
+    if (!q) return true;
+    const hay = `${c.title} ${c.summary || ''} ${c.prize || ''} ${(c.tags || []).join(' ')} ${c.platform} ${c.type || ''}`.toLowerCase();
+    return hay.includes(q);
+  });
+}
+
+function cardDateLabel(c) {
+  if (c.registrationDeadline) return `⏰ Reg closes ${String(c.registrationDeadline).slice(0, 10)}`;
+  if (c.startDate) return `🚀 ${String(c.startDate).slice(0, 10)} ${c.endDate ? '→ ' + String(c.endDate).slice(0, 10) : ''}`;
+  return '';
+}
+
+function renderDiscoverGrid() {
+  const grid = $('discover-grid');
+  const list = filteredCards();
+  if (!list.length) {
+    const q = ($('discover-filter').value || '').trim() || ($('discover-source-filter').value) || ($('discover-type-filter').value);
+    grid.innerHTML = `<div class="d-card-empty">${
+      discoverCards.length
+        ? 'No cards match the current filter.'
+        : (q ? 'Scanning nahi hua abhi — "🔄 Scan Now" dabao.' : 'No live opportunities yet — hit "🔄 Scan Now" to scrape real data.')}</div>`;
     return;
   }
-  list.innerHTML = hackathons.map((h) => `
-    <div class="ws-item ${h.id === currentHackId ? 'selected' : ''}" data-id="${escHtml(h.id)}">
-      <div class="ws-item-row">
-        <div class="ws-item-title">${escHtml(h.title || 'Untitled')}</div>
-      </div>
-      <div class="ws-item-sub">${escHtml(h.link || h.mode || '')} ${h.participating ? '· ✅ participating' : ''}</div>
-      ${h.startDate ? `<div class="ws-item-sub">📅 ${new Date(h.startDate).toLocaleDateString()} ${h.endDate ? '→ ' + new Date(h.endDate).toLocaleDateString() : ''}</div>` : ''}
-      <div class="ws-item-actions">
-        ${h.prize ? `<span class="ws-item-sub">💰 ${escHtml(h.prize)}</span>` : ''}
-      </div>
-    </div>`).join('');
-  list.querySelectorAll('.ws-item').forEach((el) => {
-    el.addEventListener('click', () => openHackathon(el.dataset.id));
-  });
-}
+  grid.innerHTML = list.map((c) => {
+    const isIntern = (c.type || 'hackathon') === 'internship';
+    const badge = c.typeDisplay || (isIntern ? '💼 INTERNSHIP' : '🏆 HACKATHON');
+    const metaBits = [
+      c.mode ? c.mode : '',
+      c.location ? c.location : '',
+      isIntern ? (c.stipend ? `, stipend ${c.stipend}` : '') : (c.fee ? `, ${c.fee}` : ''),
+      isIntern && c.duration ? `, ${c.duration}` : '',
+      !isIntern && c.seatsStatus ? `, ${c.seatsStatus}` : '',
+    ].join(' | ').replace(/^\s*\|\s*/, '');
+    return `
+      <div class="d-card" data-id="${escHtml(c.id)}">
+        <div class="d-card-head">
+          <div>
+            <div class="d-card-title">${escHtml(c.title || 'Untitled')}</div>
+            <div class="d-card-source ${escHtml(c.platform || '')}">${escHtml(badge)} · ${escHtml(c.platform || '')}</div>
+          </div>
+        </div>
+        <div class="d-card-body">
+          ${c.summary ? `<p>${escHtml(c.summary)}</p>` : ''}
+          ${c.whatToBuild ? `<p style="margin-top:6px"><strong>What to build:</strong> ${escHtml(c.whatToBuild)}</p>` : ''}
+          ${c.prize ? `<p style="margin-top:6px"><span class="d-prize">💰 ${escHtml(c.prize)}</span></p>` : ''}
+          ${isIntern && c.company ? `<p style="margin-top:4px">🏢 ${escHtml(c.company)}</p>` : ''}
+          ${metaBits ? `<p style="margin-top:6px">📍 ${escHtml(metaBits)}</p>` : ''}
+          ${cardDateLabel(c) ? `<p style="margin-top:4px">${escHtml(cardDateLabel(c))}</p>` : ''}
+        </div>
+        ${(c.tags && c.tags.length) ? `<div class="d-card-meta">${c.tags.slice(0, 6).map((t) => `<span class="d-card-tag">${escHtml(t)}</span>`).join('')}</div>` : ''}
+        <div class="d-card-foot">
+          ${c.link ? `<a class="d-link" href="${escHtml(c.link)}" target="_blank" rel="noopener">🔗 View details ↗</a>` : ''}
+          <div class="d-card-actions">
+            <button class="btn-ghost" data-save="${escHtml(c.id)}">💾 Save</button>
+            <button class="btn-ghost-red" data-dismiss="${escHtml(c.id)}">✕ Dismiss</button>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
 
-async function openHackathon(id) {
-  currentHackId = id;
-  renderHackathons();
-  try {
-    const data = await apiFetch(`/api/hackathons/${id}`);
-    const h = data.hackathon;
-    renderHackathonDetail(h);
-    $('hack-empty-state').style.display = 'none';
-    $('hack-workspace').style.display = 'flex';
-    renderHackMsgs(h.messages || []);
-  } catch (err) {
-    alert('Could not open hackathon: ' + err.message);
-  }
-}
-
-function renderHackathonDetail(h) {
-  $('hack-title').textContent = h.title || 'Untitled';
-  $('hack-meta').innerHTML = [
-    h.link ? `<a href="${escHtml(h.link)}" target="_blank" rel="noopener">🔗 ${escHtml(h.link)}</a>` : '',
-    h.mode ? `· ${escHtml(h.mode)}` : '',
-    h.prize ? `· 🏆 ${escHtml(h.prize)}` : '',
-    h.status ? `· <span class="ws-chat-header-status ${h.status === 'ended' ? 'grey' : 'green'}">${escHtml(h.status)}</span>` : '',
-  ].filter(Boolean).join(' ');
-  $('hack-participating').checked = !!h.participating;
-}
-
-function renderHackMsgs(messages) {
-  const c = $('hack-messages');
-  c.innerHTML = '';
-  (messages || []).forEach((m) => {
-    const div = document.createElement('div');
-    div.className = `ws-msg ${m.role === 'user' ? 'user' : 'assistant'}`;
-    div.innerHTML = `
-      <div class="ws-msg-role">${m.role === 'user' ? 'You' : 'Ek Sathi'}</div>
-      <div class="ws-msg-text">${mdToHtml(m.content)}</div>`;
-    c.appendChild(div);
-  });
-  scrollToBottom(c);
-}
-
-function hackMsg(role, text) {
-  const c = $('hack-messages');
-  const div = document.createElement('div');
-  div.className = `ws-msg ${role === 'user' ? 'user' : 'assistant'}`;
-  div.innerHTML = `
-    <div class="ws-msg-role">${role === 'user' ? 'You' : 'Ek Sathi'}</div>
-    <div class="ws-msg-text">${mdToHtml(text)}</div>`;
-  c.appendChild(div);
-  scrollToBottom(c);
-}
-
-async function sendHackMessage() {
-  if (!currentHackId) { alert('Pehle ek hackathon select karo.'); return; }
-  const input = $('hack-input');
-  const text = input.value.trim();
-  if (!text) return;
-  input.value = '';
-  hackMsg('user', text);
-  hackMsg('assistant', '⏳ Ek Sathi soch raha hai…');
-  try {
-    const data = await apiFetch(`/api/hackathons/${currentHackId}/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text }),
-    });
-    const msgs = $('hack-messages');
-    msgs.querySelectorAll('.ws-msg').forEach((el) => {
-      if (el.textContent.includes('soch raha hai')) el.remove();
-    });
-    hackMsg('assistant', data.reply || '…');
-    if (voiceEnabled && data.reply) speak(data.reply);
-  } catch (err) {
-    const msgs = $('hack-messages');
-    msgs.querySelectorAll('.ws-msg').forEach((el) => {
-      if (el.textContent.includes('soch raha hai')) el.remove();
-    });
-    hackMsg('assistant', '⚠️ ' + err.message);
-  }
-}
-
-/* ── Hackathon modal ───────────────────────────────────── */
-function openHackModal() {
-  $('hack-modal').style.display = 'flex';
-  $('hack-form').style.display = 'none';
-  $('hack-paste-input').value = '';
-}
-
-function closeHackModal() {
-  $('hack-modal').style.display = 'none';
-}
-
-function bindHackModal() {
-  $('hack-add-btn').addEventListener('click', openHackModal);
-  $('hack-modal-close').addEventListener('click', closeHackModal);
-  $('hack-cancel-btn').addEventListener('click', closeHackModal);
-  $('hack-modal').addEventListener('click', (e) => { if (e.target === $('hack-modal')) closeHackModal(); });
-
-  $('hack-parse-btn').addEventListener('click', async () => {
-    const raw = $('hack-paste-input').value.trim();
-    if (!raw) { alert('Kuch paste karo pehle.'); return; }
+  grid.querySelectorAll('[data-save]').forEach((b) => b.addEventListener('click', async () => {
+    const id = b.dataset.save;
     try {
-      const data = await apiFetch('/api/hackathons/parse', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rawText: raw }) });
-      const p = data.parsed || {};
-      $('hack-f-title').value = p.title || '';
-      $('hack-f-link').value = p.link || '';
-      $('hack-f-source').value = p.source || '';
-      $('hack-f-mode').value = p.mode === 'online' ? 'Online' : p.mode === 'offline' ? 'Offline' : p.mode === 'hybrid' ? 'Hybrid' : '';
-      $('hack-f-prize').value = p.prize || '';
-      $('hack-f-desc').value = p.description || '';
-      $('hack-f-rules').value = (p.rules || []).join('\n');
-      if (p.startDate) $('hack-f-start').value = new Date(Number(p.startDate)).toISOString().slice(0, 10);
-      if (p.endDate) $('hack-f-end').value = new Date(Number(p.endDate)).toISOString().slice(0, 10);
-      $('hack-form').style.display = 'block';
-    } catch (err) { alert('Parse failed: ' + err.message); }
-  });
-
-  $('hack-manual-btn').addEventListener('click', () => { $('hack-form').style.display = 'block'; });
-
-  $('hack-save-btn').addEventListener('click', async () => {
-    const title = $('hack-f-title').value.trim();
-    const link = $('hack-f-link').value.trim();
-    if (!title && !link) { alert('Title ya Link to do.'); return; }
-    const body = {
-      title: title || undefined,
-      link: link || undefined,
-      source: $('hack-f-source').value.trim() || undefined,
-      mode: $('hack-f-mode').value.toLowerCase() || undefined,
-      prize: $('hack-f-prize').value.trim() || undefined,
-      description: $('hack-f-desc').value.trim() || undefined,
-      rules: $('hack-f-rules').value.split('\n').map((s) => s.trim()).filter(Boolean),
-      startDate: $('hack-f-start').value ? new Date($('hack-f-start').value).getTime() : undefined,
-      endDate: $('hack-f-end').value ? new Date($('hack-f-end').value).getTime() : undefined,
-    };
-    try {
-      const data = await apiFetch('/api/hackathons', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      closeHackModal();
-      await loadHackathons();
-      if (data.hackathon?.id) openHackathon(data.hackathon.id);
+      await apiFetch(`/api/hackathons/discover/${id}/save`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ participating: false }) });
+      await loadDiscoverCards();
     } catch (err) { alert('Save failed: ' + err.message); }
-  });
-}
-
-function bindHackActions() {
-  $('hack-participating').addEventListener('change', async (e) => {
-    if (!currentHackId) return;
+  }));
+  grid.querySelectorAll('[data-dismiss]').forEach((b) => b.addEventListener('click', async () => {
+    const id = b.dataset.dismiss;
     try {
-      await apiFetch(`/api/hackathons/${currentHackId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ participating: e.target.checked }),
-      });
-      renderHackathons();
-    } catch (err) { alert(err.message); }
-  });
-  $('hack-scrape-btn').addEventListener('click', async () => {
-    if (!currentHackId) return;
-    try {
-      const data = await apiFetch(`/api/hackathons/${currentHackId}/scrape`, { method: 'POST' });
-      renderHackathonDetail(data.hackathon);
-      await loadHackathons();
-    } catch (err) { alert('Scrape failed: ' + err.message); }
-  });
-  $('hack-discover-btn').addEventListener('click', async () => {
-    try {
-      const data = await apiFetch('/api/hackathons/discover');
-      const cards = data.cards || [];
-      if (!cards.length) {
-        alert(cards.length ? '' : 'Abhi koi naye hackathon nahi mile. Baad me try karo');
-        return;
-      }
-      const lines = cards.slice(0, 8).map((c) => `${c.title || 'Untitled'} — ${c.link || ''}`.trim());
-      alert('🔍 Discovered candidates:\n\n' + lines.join('\n') + '\n\nKisi ko save karne ke liye chat me likho ya manual add karo.');
-    } catch (err) { alert('Discover failed: ' + err.message); }
-  });
-  $('hack-send').addEventListener('click', sendHackMessage);
-  $('hack-input').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendHackMessage(); } });
+      await apiFetch(`/api/hackathons/discover/${id}/dismiss`, { method: 'POST' });
+      await loadDiscoverCards();
+    } catch (err) { alert('Dismiss failed: ' + err.message); }
+  }));
 }
 
 /* ── Study: GitHub ─────────────────────────────────────── */
@@ -669,6 +566,14 @@ function bindStudy() {
   });
 }
 
+/* ── Discovery bind ────────────────────────────────────── */
+function bindDiscovery() {
+  $('hack-scan-btn').addEventListener('click', scanNow);
+  $('discover-filter').addEventListener('input', renderDiscoverGrid);
+  $('discover-source-filter').addEventListener('change', renderDiscoverGrid);
+  $('discover-type-filter').addEventListener('change', renderDiscoverGrid);
+}
+
 /* ── Init ──────────────────────────────────────────────── */
 function init() {
   document.querySelectorAll('.nav-btn').forEach((b) => b.addEventListener('click', () => showView(b.dataset.view)));
@@ -684,30 +589,26 @@ function init() {
   $('model-selector').addEventListener('change', (e) => { localStorage.setItem('preferred_model', e.target.value); });
 
   const sidebar = $('sidebar');
-  const closeSide = () => sidebar.classList.remove('open');
-  const toggleSide = () => sidebar.classList.toggle('open');
-  [$('toggle-sidebar-btn'), $('mobile-menu-btn')].forEach((b) => b && b.addEventListener('click', toggleSide));
-  document.querySelectorAll('.nav-btn').forEach((b) => b.addEventListener('click', closeSide));
+  if (sidebar) {
+    const closeSide = () => sidebar.classList.remove('open');
+    const toggleSide = () => sidebar.classList.toggle('open');
+    [$('toggle-sidebar-btn'), $('mobile-menu-btn')].forEach((b) => b && b.addEventListener('click', toggleSide));
+    document.querySelectorAll('.nav-btn').forEach((b) => b.addEventListener('click', closeSide));
+  }
   $('logout-btn').addEventListener('click', () => {
     if (confirm('Clear local preferences and reload?')) { localStorage.clear(); location.reload(); }
   });
 
-  initTTS();
   bindAttach();
-  bindHackModal();
-  bindHackActions();
   bindStudy();
+  bindDiscovery();
   bindWelcomeChips();
   resetChatUI();
-  if (voiceEnabled && !ttsWarmed) { window.speechSynthesis.getVoices(); ttsWarmed = true; }
 
   loadSessions();
 
-  // Auto-restore last model choice
   const m = localStorage.getItem('preferred_model');
   if (m) $('model-selector').value = m;
 }
-
-let ttsWarmed = false;
 
 document.addEventListener('DOMContentLoaded', init);

@@ -27,7 +27,9 @@ const hackathonService = require('./hackathonService');
 
 // ── Constants ────────────────────────────────────────────
 const DISCOVERY_INTERVAL_MS = 4 * 24 * 60 * 60 * 1000; // 4 days
-const MAX_CARDS = 10; // max cards shown at one time
+const MAX_CARDS = 20; // max cards shown at one time
+const MAX_HACKATHONS = 14; // hackathons get priority but leave room for internships
+const MAX_INTERNSHIPS = 6; // guaranteed internship slots in each batch
 const SCRAPE_TIMEOUT = 15000; // 15s per platform
 
 // CSE domain keywords for quick pre-filter
@@ -329,6 +331,139 @@ async function scrapeDevfolio() {
   return items;
 }
 
+/**
+ * HackerEarth: https://www.hackerearth.com/challenges/hackathon/
+ */
+async function scrapeHackerEarth() {
+  const items = [];
+  try {
+    const html = await safeFetch('https://www.hackerearth.com/challenges/hackathon/');
+    const $ = cheerio.load(html);
+    $('.challenge-card, .challenge-list .challenge, [class*="challenge-card"]').each((_, el) => {
+      try {
+        const title = $(el).find('.challenge-title, h2, .name').first().text().trim();
+        const href = $(el).find('a').first().attr('href') || '';
+        if (!title || !href) return;
+        const link = href.startsWith('http') ? href : `https://www.hackerearth.com${href}`;
+        const prize = $(el).find('[class*="prize"], [class*="amount"], .challenge-description').first().text().trim().slice(0, 140);
+        const deadline = $(el).find('[class*="date"], .time-left, .ends').first().text().trim();
+        const tags = [];
+        $(el).find('.tag, .chip, [class*="theme"]').each((_, t) => {
+          const x = $(t).text().trim();
+          if (x) tags.push(x);
+        });
+        items.push({ title, link, prize, deadlineText: deadline, tags, platform: 'hackerearth' });
+      } catch (_) {}
+    });
+  } catch (e) {
+    console.warn('[HackDiscovery] HackerEarth scrape failed:', e.message);
+  }
+  console.log(`[HackDiscovery] HackerEarth: found ${items.length} raw items`);
+  return items;
+}
+
+/**
+ * MLH (Major League Hacking): https://www.mlh.com/seasons/2026/events
+ * Local Hackathons — weekend events across the US/global
+ */
+async function scrapeMlh() {
+  const items = [];
+  try {
+    const html = await safeFetch('https://www.mlh.com/seasons/2026/events');
+    const $ = cheerio.load(html);
+    $('.event, [class*="event"]').each((_, el) => {
+      try {
+        const a = $(el).find('a').first();
+        const href = a.attr('href') || '';
+        let title = a.attr('title') || '';
+        if (!title) title = $(el).find('h2, h3, [class*="name"]').first().text().trim();
+        if (!title) title = $(el).text().trim().slice(0, 120);
+        if (!title || !href) return;
+        const link = href.startsWith('http') ? href : `https://www.mlh.com${href}`;
+        const when = $(el).find('[class*="date"], time, [class*="when"]').first().text().trim() || '';
+        const where = $(el).find('[class*="local"], [class*="place"], [class*="location"]').first().text().trim() || '';
+        items.push({
+          title,
+          link,
+          prize: 'Prizes & Swags',
+          deadlineText: when,
+          tags: [...(where ? [where] : []), 'In-Person', 'Hackathon'].filter(Boolean),
+          platform: 'mlh',
+        });
+      } catch (_) {}
+    });
+  } catch (e) {
+    console.warn('[HackDiscovery] MLH scrape failed:', e.message);
+  }
+  console.log(`[HackDiscovery] MLH: found ${items.length} raw items`);
+  return items;
+}
+
+/**
+ * Internshala: software-engineering + computer-science internship category pages
+ * (guarantees IT careers instead of the mixed general feed).
+ * Items get type:'internship' + stipend/duration/company so the UI can show
+ * internship-specific fields separately from hackathon prizes.
+ */
+async function scrapeInternshala() {
+  const items = [];
+  const pages = [
+    'https://internshala.com/internships/software-development-internship',
+    'https://internshala.com/internships/computer-science-internship',
+  ];
+  const seen = new Set();
+  for (const page of pages) {
+    if (items.length >= MAX_INTERNSHIPS * 4) break;
+    try {
+      const html = await safeFetch(page);
+      const $ = cheerio.load(html);
+      $('.individual_internship').each((_, el) => {
+        try {
+          const a = $(el).find('a.job-title-href');
+          const href = a.attr('href') || '';
+          const title = a.first().text().trim() || $(el).find('.job-internship-name').text().trim();
+          if (!title || !href) return;
+          const link = href.startsWith('http') ? href : `https://internshala.com${href}`;
+          const norm = link.split('?')[0].toLowerCase();
+          if (seen.has(norm)) return;
+          seen.add(norm);
+          const company = $(el).find('.company-name').first().text().trim();
+          const stipendText = $(el).find('.stipend').first().text().trim();
+          const locCell = $(el).find('.row-1-item.locations').first().text().replace(/\s+/g, ' ').trim();
+          const location = locCell.split('(')[0].trim();
+          const mode = locCell.includes('(Hybrid)') ? 'hybrid' : locCell.includes('(Work From Home)') || locCell.includes('(Remote)') ? 'online' : 'offline';
+          // Duration is the 3rd meta item (after location + stipend)
+          let duration = '';
+          $(el).find('.detail-row-1 .row-1-item').each((_, it) => {
+            const t = $(it).text().trim();
+            if (t && !t.toLowerCase().includes('in-office') && !t.includes('₹') && !it.attribs.class.includes('locations')) {
+              duration = t.replace(/\s+/g, ' ').trim();
+            }
+          });
+          items.push({
+            title,
+            link,
+            prize: stipendText,
+            deadlineText: '',
+            tags: ['Internship', 'IT'],
+            platform: 'internshala',
+            type: 'internship',
+            company,
+            stipend: stipendText,
+            duration,
+            mode,
+            location,
+          });
+        } catch (_) {}
+      });
+    } catch (e) {
+      console.warn('[HackDiscovery] Internshala scrape failed:', e.message);
+    }
+  }
+  console.log(`[HackDiscovery] Internshala: found ${items.length} raw items`);
+  return items;
+}
+
 // ── CSE Quick Pre-filter (keyword based) ─────────────────
 function quickCseFilter(item) {
   const text = `${item.title} ${item.tags.join(' ')}`.toLowerCase();
@@ -345,6 +480,20 @@ function quickCseFilter(item) {
 
   // If title has no strong exclude — give benefit of doubt (LLM will decide)
   return true;
+}
+
+// ── Strict IT filter for internships ────────────────────────
+// Internships skip the hackathon LLM classifier, so they must be
+// unambiguously software/IT — no benefit of doubt here.
+// Uses word-boundary matching so 2-letter terms like "ai"/"ml" don't
+// false-positive inside words like "fundRaising".
+const CSE_INCLUDE_RE = new RegExp(`\\b(?:${CSE_INCLUDE.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})\\b`, 'i');
+function strictItFilter(item) {
+  const text = `${item.title} ${item.company || ''} ${item.tags.join(' ')}`.toLowerCase();
+  for (const kw of CSE_EXCLUDE) {
+    if (text.includes(kw)) return false;
+  }
+  return CSE_INCLUDE_RE.test(text);
 }
 
 // ── LLM CSE Relevance Filter ──────────────────────────────
@@ -531,17 +680,23 @@ async function runDiscovery(userId, force = false) {
 
   console.log('[HackDiscovery] Starting discovery run...');
 
-  // 1. Scrape all 3 platforms in parallel
-  const [devpostItems, unstopItems, devfolioItems] = await Promise.allSettled([
+  // 1. Scrape all platforms in parallel
+  const [devpostItems, unstopItems, devfolioItems, hackerearthItems, mlhItems, internshalaItems] = await Promise.allSettled([
     scrapeDevpost(),
     scrapeUnstop(),
     scrapeDevfolio(),
+    scrapeHackerEarth(),
+    scrapeMlh(),
+    scrapeInternshala(),
   ]);
 
   const allItems = [
     ...(devpostItems.status === 'fulfilled' ? devpostItems.value : []),
     ...(unstopItems.status === 'fulfilled' ? unstopItems.value : []),
     ...(devfolioItems.status === 'fulfilled' ? devfolioItems.value : []),
+    ...(hackerearthItems.status === 'fulfilled' ? hackerearthItems.value : []),
+    ...(mlhItems.status === 'fulfilled' ? mlhItems.value : []),
+    ...(internshalaItems.status === 'fulfilled' ? internshalaItems.value : []),
   ];
 
   console.log(`[HackDiscovery] Total raw items: ${allItems.length}`);
@@ -561,13 +716,23 @@ async function runDiscovery(userId, force = false) {
     return { added: 0, nextRunAt: now + DISCOVERY_INTERVAL_MS };
   }
 
-  // 3. Quick keyword pre-filter
+  // 3. Quick keyword pre-filter (applies to hackathons AND internships)
   const preFiltered = unseenItems.filter(quickCseFilter);
   console.log(`[HackDiscovery] After keyword filter: ${preFiltered.length} items`);
 
-  // 4. LLM CSE filter (batch)
-  const llmFiltered = await llmFilterCse(preFiltered);
-  console.log(`[HackDiscovery] After LLM filter: ${llmFiltered.length} items`);
+  // 4. LLM CSE filter — hackathons only; internships use the strict IT filter
+  //    (the classifier prompt is hackathon-specific).
+  const hackathonCandidates = preFiltered.filter((it) => it.type !== 'internship');
+  const internshipCandidates = preFiltered.filter((it) => it.type === 'internship');
+  const itInternships = internshipCandidates.filter(strictItFilter);
+
+  // Hackathons get priority but capped so internships always get slots.
+  const hackathonFiltered = await llmFilterCse(hackathonCandidates);
+  const hackathonPick = hackathonFiltered.slice(0, MAX_HACKATHONS);
+  const internshipPick = itInternships.slice(0, MAX_INTERNSHIPS);
+
+  const llmFiltered = [...hackathonPick, ...internshipPick].slice(0, MAX_CARDS);
+  console.log(`[HackDiscovery] After LLM filter: ${llmFiltered.length} items (${hackathonPick.length} hackathons, ${internshipPick.length} internships)`);
 
   // 5. Limit to top MAX_CARDS
   const toAdd = llmFiltered.slice(0, MAX_CARDS);
@@ -588,6 +753,7 @@ async function runDiscovery(userId, force = false) {
     const ref = coll.doc();
     batch.set(ref, {
       id: ref.id,
+      type: item.type || 'hackathon',
       title: item.title,
       platform: item.platform,
       link: item.link,
@@ -599,7 +765,7 @@ async function runDiscovery(userId, force = false) {
       certificatesInfo: item.certificatesInfo || 'Certificate provided for valid submissions',
       fee: item.fee || 'Free Entry',
       mode: item.mode || 'online',
-      location: item.location || 'Virtual / Online',
+      location: item.location || (item.type === 'internship' ? 'Remote / On-site' : 'Virtual / Online'),
       seatsStatus: item.seatsStatus || 'Open',
       tags: item.tags || [],
       teamSize: item.teamSize || '1-4 Members',
@@ -607,6 +773,9 @@ async function runDiscovery(userId, force = false) {
       registrationDeadline: item.registrationDeadline || null,
       startDate: item.startDate || null,
       endDate: item.endDate || null,
+      company: item.company || '',
+      stipend: item.stipend || '',
+      duration: item.duration || '',
       scrapedAt: now,
       discoveredAt: now,
       status: 'new',
