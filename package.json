@@ -1,7 +1,7 @@
 {
-  "name": "bob-backend",
+  "name": "ek-sathi-backend",
   "version": "1.0.0",
-  "description": "Bob — personal AI assistant backend (LLM routing, memory, auth, file storage)",
+  "description": "Ek Sathi — personal AI companion backend (LLM routing, local memory, chat, hackathon & study)",
   "main": "src/server.js",
   "type": "commonjs",
   "scripts": {
@@ -11,21 +11,17 @@
   "keywords": [
     "assistant",
     "llm",
-    "openrouter",
-    "firebase",
-    "cloudinary"
+    "openrouter"
   ],
   "author": "",
   "license": "ISC",
   "dependencies": {
     "cheerio": "^1.2.0",
-    "cloudinary": "^2.4.0",
     "cors": "^2.8.5",
     "docx": "^9.7.1",
     "dotenv": "^16.4.5",
     "exceljs": "^4.4.0",
     "express": "^4.19.2",
-    "firebase-admin": "^12.3.1",
     "jszip": "^3.10.1",
     "mammoth": "^1.8.0",
     "multer": "^1.4.5-lts.1",

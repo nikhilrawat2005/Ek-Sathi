@@ -111,7 +111,7 @@ async function listSessionSummaries(userId, sessionId) {
 }
 
 
-const VALID_CATEGORIES = ['habits', 'main', 'hackathons', 'stalker', 'vault', 'builder'];
+const VALID_CATEGORIES = ['habits', 'main', 'hackathons', 'stalker', 'vault'];
 
 function detectCategory(text, explicitCategory) {
   if (explicitCategory && VALID_CATEGORIES.includes(explicitCategory)) {
@@ -158,20 +158,6 @@ function detectCategory(text, explicitCategory) {
     t.includes('pin:')
   ) {
     return 'vault';
-  }
-  if (
-    t.includes('builder') ||
-    t.includes('codebase') ||
-    t.includes('architecture') ||
-    t.includes('vibecoding') ||
-    t.includes('backend') ||
-    t.includes('frontend') ||
-    t.includes('tech stack') ||
-    t.includes('learning dsa') ||
-    t.includes('data structures and algorithms') ||
-    t.includes('system setup')
-  ) {
-    return 'builder';
   }
   return 'main';
 }
@@ -683,7 +669,6 @@ async function getUnifiedMemoryHub(userId) {
 
   const counts = {
     habits: facts.filter(f => f.category === 'habits').length,
-    builder: facts.filter(f => f.category === 'builder').length,
     main: facts.filter(f => f.category === 'main').length,
     vault: facts.filter(f => f.category === 'vault').length,
     stalker: stalkerFactsCount + stalkerProfiles.length + stalkerInsightCount,

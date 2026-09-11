@@ -4,10 +4,9 @@ const geminiPool = require('./geminiPoolService');
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 // ---------------------------------------------------------------------------
-// 3-Block Dynamic Queue Key Bag Architecture
-// Block 1: Bob Key Bag (Queue A: Active ⇄ Queue B: Cooldown/Rest)
-// Block 2: Builder Key Bag (Queue A: Active ⇄ Queue B: Cooldown/Rest)
-// Block 3: Gemini Burst Bag (Managed via geminiPoolService)
+// Single-Queue Key Bag Architecture (no Builder persona)
+// Ek Sathi Key Bag (Queue A: Active ⇄ Queue B: Cooldown/Rest)
+// Block : Gemini Burst Bag (Managed via geminiPoolService)
 // ---------------------------------------------------------------------------
 
 const _rawKeys = [];
@@ -31,30 +30,8 @@ if (process.env.BOB_API_KEY && process.env.BOB_API_KEY.trim()) {
   if (!_rawKeys.includes(k)) { _rawKeys.unshift(k); _keyEnvName.set(k, 'BOB_API_KEY'); }
 }
 
-const _builderKeys = [];
-// Loop up to 99 for builder keys too
-for (let i = 1; i <= 99; i++) {
-  const envName = `BUILDER_API_KEY${i}`;
-  const raw = process.env[envName];
-  if (raw && raw.trim() && !_builderKeys.includes(raw.trim())) {
-    _builderKeys.push(raw.trim());
-    _keyEnvName.set(raw.trim(), envName);
-  }
-}
-if (process.env.BUILDER_API_KEY && process.env.BUILDER_API_KEY.trim()) {
-  const b0 = process.env.BUILDER_API_KEY.trim();
-  if (!_builderKeys.includes(b0)) { _builderKeys.unshift(b0); _keyEnvName.set(b0, 'BUILDER_API_KEY'); }
-}
-
-// Remove builder keys from Bob pool if duplicate
-for (const bk of _builderKeys) {
-  for (let i = _rawKeys.length - 1; i >= 0; i--) {
-    if (_rawKeys[i] === bk) _rawKeys.splice(i, 1);
-  }
-}
-
 function _allVisibleKeys() {
-  return _builderKeys.length ? [..._rawKeys, ..._builderKeys] : _rawKeys.slice();
+  return _rawKeys.slice();
 }
 
 function _keyIdOf(key) {
@@ -62,7 +39,6 @@ function _keyIdOf(key) {
   if (envVar) {
     const match = envVar.match(/(\d+)$/);
     const num = match ? match[1] : '';
-    if (envVar.startsWith('BUILDER_API_KEY')) return num ? `BUILDER${num}` : 'BUILDER';
     if (envVar.startsWith('BOB_API_KEY')) return num ? `BOB${num}` : 'BOB';
     return num ? `KEY${num}` : 'KEY';
   }
@@ -216,31 +192,12 @@ class DualQueueKeyBag {
 }
 
 // ---------------------------------------------------------------------------
-// Key Pool Distribution: Always split shared pool 50/50 between Bob and Builder.
-//
-// Rule: _rawKeys (OPENROUTER_API_KEY2..KEY20) are ALWAYS split evenly.
-//   Bob    → first half  (e.g. KEY2 .. KEY11, 10 keys)
-//   Builder → second half (e.g. KEY12 .. KEY20, 9 keys)
-//
-// If dedicated BUILDER_API_KEY* env vars also exist, those are PREPENDED to
-// Builder's half (deduped) — they don't override the split.
+// Key Pool: All shared keys go into the single Ek Sathi Key Bag.
 // ---------------------------------------------------------------------------
-const total     = _rawKeys.length;
-const bobCount  = Math.ceil(total / 2); // Bob gets the slightly larger half
-const _bobPoolKeys     = _rawKeys.slice(0, bobCount);
-const _builderHalf     = _rawKeys.slice(bobCount);
+console.log(`[llmService] Ek Sathi Key Bag → ${_rawKeys.length} keys`);
 
-// Prepend any dedicated BUILDER_API_KEY* keys to Builder's half (deduplicate)
-const _builderPoolKeys = [
-  ..._builderKeys.filter(k => !_builderHalf.includes(k)),
-  ..._builderHalf,
-];
-
-console.log(`[llmService] Key split → Bob=${_bobPoolKeys.length} keys | Builder=${_builderPoolKeys.length} keys (${_builderKeys.length} dedicated + ${_builderHalf.length} shared)`);
-
-// Instantiate Bob Bag and Builder Bag
-const _bobBag     = new DualQueueKeyBag('BOB',     _bobPoolKeys);
-const _builderBag = new DualQueueKeyBag('BUILDER', _builderPoolKeys.length ? _builderPoolKeys : _bobPoolKeys);
+// Instantiate the single Ek Sathi Key Bag
+const _bobBag = new DualQueueKeyBag('EKSATHI', _rawKeys);
 
 async function _persistKey(keyId, data) {
   const db = _firestore();
@@ -256,7 +213,7 @@ async function _loadState() {
   if (!db) { _stateLoaded = true; return; }
   try {
     const snap = await db.collection('keyStates').get();
-    const all = [..._bobBag.keys, ..._builderBag.keys];
+    const all = [..._bobBag.keys];
     snap.forEach(doc => {
       const docId = doc.id;
       const d = doc.data() || {};
@@ -284,7 +241,7 @@ async function _ensureInit() {
 // ---------------------------------------------------------------------------
 async function checkKeyHealth(cacheMs = 60000) {
   await _ensureInit();
-  const allBags = [_bobBag, _builderBag];
+  const allBags = [_bobBag];
   const results = [];
   const now = Date.now();
 
@@ -347,14 +304,13 @@ async function checkKeyHealth(cacheMs = 60000) {
 }
 
 function keyHealthSnapshot() {
-  return [..._bobBag.getSnapshot().keys, ..._builderBag.getSnapshot().keys];
+  return [..._bobBag.getSnapshot().keys];
 }
 
 async function resetKeyHealth() {
   _bobBag.resetDaily();
-  _builderBag.resetDaily();
   const db = _firestore();
-  const all = [..._bobBag.keys, ..._builderBag.keys];
+  const all = [..._bobBag.keys];
   for (const k of all) {
     k.tokens = 0;
     k.status = 'active';
@@ -375,7 +331,6 @@ async function resetKeyHealth() {
 // ---------------------------------------------------------------------------
 const MODEL_ROLES = {
   chat:     process.env.CHAT_MODEL     || 'google/gemini-2.5-flash-lite',
-  builder:  process.env.BUILDER_MODEL  || 'google/gemini-2.5-flash',
   vision:   process.env.VISION_MODEL   || 'google/gemini-2.5-flash',
   fast:     process.env.FAST_MODEL     || 'google/gemini-2.5-flash-lite',
   research: process.env.RESEARCH_MODEL || 'google/gemini-2.5-flash',
@@ -544,12 +499,12 @@ async function callOpenRouterDirect({
     estTokens: estimateTokens(finalMessages),
   });
 
-  // Select key from targeted Key Bag
-  const bag = persona === 'builder' ? _builderBag : _bobBag;
-  const keyObj = bag.getKey() || (persona === 'builder' ? _bobBag.getKey() : _builderBag.getKey());
+  // Select key from the single Ek Sathi Key Bag
+  const bag = _bobBag;
+  const keyObj = bag.getKey();
 
   if (!keyObj) {
-    throw new Error(`All OpenRouter keys for ${persona === 'builder' ? 'Builder' : 'Bob'} are currently in cooldown or rate-limited.`);
+    throw new Error('All OpenRouter keys are currently in cooldown or rate-limited.');
   }
 
   const apiKey = keyObj.key;
@@ -566,8 +521,8 @@ async function callOpenRouterDirect({
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`,
-      'HTTP-Referer': 'https://github.com/nikhilrawat2005/BoB',
-      'X-Title': 'Bob Personal Assistant',
+      'HTTP-Referer': 'https://github.com/nikhilrawat2005/Ek-Sathi',
+      'X-Title': 'Ek Sathi Personal Assistant',
     },
     body: JSON.stringify(body),
   });
@@ -639,7 +594,7 @@ async function callLLM(opts = {}) {
     return geminiPool.callGeminiWithFallback(opts, () => callOpenRouterDirect(opts));
   }
 
-  // Interactive and builder loops -> Route to OpenRouter Bag (Bob or Builder)
+  // Interactive loops -> Route to OpenRouter Ek Sathi Bag
   return callOpenRouterDirect(opts);
 }
 
@@ -685,7 +640,6 @@ module.exports = {
   getGeminiPoolHealth: geminiPool.getGeminiPoolHealth,
   getBagsSnapshot: () => ({
     bobBag: _bobBag.getSnapshot(),
-    builderBag: _builderBag.getSnapshot(),
     geminiBag: geminiPool.getGeminiPoolHealth(),
   }),
 };

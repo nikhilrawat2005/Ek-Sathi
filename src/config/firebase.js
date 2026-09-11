@@ -1,38 +1,18 @@
-const admin = require('firebase-admin');
+// ─────────────────────────────────────────────────────────
+// LOCAL-ONLY DATA LAYER (no Firebase, no cloud storage).
+// The whole backend runs 100% on localhost and persists to a
+// single JSON file (data/store.json). This module keeps the same
+// export shape the rest of the codebase expects:
+//   db            → Firestore-compatible local store
+//   firebaseAdmin → minimal shim exposing FieldValue helpers
+//   auth          → null (auth middleware no longer uses Firebase)
+// ─────────────────────────────────────────────────────────
+const { db, FieldValue } = require('./db');
 
-// Initializes Firebase Admin once, using env vars (never a committed JSON file).
-// The private key comes from .env with literal "\n" — we convert those back to real newlines.
-// If FIREBASE_PROJECT_ID is not set, initialization is skipped with a warning so the
-// server can still start (health check, LLM-only routes work without Firebase).
-function initFirebase() {
-  if (admin.apps.length) return admin;
+const firebaseAdmin = {
+  firestore: { FieldValue },
+};
 
-  if (!process.env.FIREBASE_PROJECT_ID) {
-    console.warn(
-      '[firebase] WARNING: FIREBASE_PROJECT_ID not set — Firebase Admin not initialised. ' +
-      'Memory, auth, and file routes will be unavailable until you add Firebase env vars.'
-    );
-    return null;
-  }
-
-  const privateKey = (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n');
-
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey,
-    }),
-  });
-
-  return admin;
-}
-
-const firebaseAdmin = initFirebase();
-
-// db and auth will be null when Firebase is not configured —
-// any route that calls them will get a runtime error with a descriptive message.
-const db   = firebaseAdmin ? firebaseAdmin.firestore() : null;
-const auth = firebaseAdmin ? firebaseAdmin.auth()      : null;
+const auth = null;
 
 module.exports = { firebaseAdmin, db, auth };

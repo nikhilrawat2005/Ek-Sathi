@@ -13,3 +13,6 @@ node_modules/
 # Plaintext API key dumps — NEVER commit these
 geminikeys.txt
 *keys*.txt
+
+# Local data store (JSON-file Firestore) + uploaded files — local only
+data/

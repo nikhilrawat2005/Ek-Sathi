@@ -1,4 +1,5 @@
 const express = require('express');
+const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
 const router = express.Router();
@@ -171,32 +172,39 @@ const MIME_MAP = {
   lua: CODE_TEXT,
 };
 
+// Serves a stored file's bytes from local disk.
+function serveLocalFile(res, file, disposition) {
+  if (!file.localPath || !fs.existsSync(file.localPath)) {
+    console.error(`[files] local file missing for ${file.id}: ${file.localPath}`);
+    res.status(404).send('Stored file is missing on disk.');
+    return false;
+  }
+  const ext = (path.extname(file.originalName || '').slice(1) || '').toLowerCase();
+  const contentType = MIME_MAP[ext] || file.mimeType || 'application/octet-stream';
+  res.setHeader('Content-Type', contentType);
+  res.setHeader('Content-Disposition', `${disposition}; filename="${encodeURIComponent(file.originalName || 'file')}"`);
+  res.setHeader('Cache-Control', 'public, max-age=86400');
+  res.sendFile(file.localPath);
+  return true;
+}
+
 // GET /api/files/:id/view  (Streams file with inline disposition so browser renders it natively)
 router.get('/:id/view', requireAuth, async (req, res) => {
   try {
     const file = await fileService.getFile(req.userId, req.params.id);
-    if (!file || !file.url) return res.status(404).send('File not found');
-
-    const ext = (path.extname(file.originalName || '').slice(1) || '').toLowerCase();
-    const contentType = MIME_MAP[ext] || file.mimeType || 'application/octet-stream';
-
-    const response = await fetch(file.url);
-    // BUGFIX: this used to be `return res.redirect(file.url)`. That threw away
-    // every header we set below (so the browser got Cloudinary's own
-    // octet-stream + no filename, because our public_ids have no extension) AND
-    // leaked the permanent public storage URL to the user. If the origin fetch
-    // failed, the honest answer is an error.
-    if (!response.ok) {
-      console.error(`[files/view] upstream fetch failed for ${req.params.id}: HTTP ${response.status}`);
-      return res.status(502).send('Stored file is currently unreachable. Please try again.');
+    if (!file) return res.status(404).send('File not found');
+    if (serveLocalFile(res, file, 'inline')) return;
+    if (file.url && !String(file.url).startsWith('/api/')) {
+      const response = await fetch(file.url);
+      if (!response.ok) {
+        console.error(`[files/view] upstream fetch failed for ${req.params.id}: HTTP ${response.status}`);
+        return res.status(502).send('Stored file is currently unreachable. Please try again.');
+      }
+      const arrayBuffer = await response.arrayBuffer();
+      res.send(Buffer.from(arrayBuffer));
+      return;
     }
-
-    res.setHeader('Content-Type', contentType);
-    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(file.originalName || 'file')}"`);
-    res.setHeader('Cache-Control', 'public, max-age=86400');
-
-    const arrayBuffer = await response.arrayBuffer();
-    res.send(Buffer.from(arrayBuffer));
+    return res.status(404).send('File not found');
   } catch (err) {
     console.error('[files/view] error:', err.message);
     res.status(500).send('Error viewing file: ' + err.message);
@@ -207,23 +215,19 @@ router.get('/:id/view', requireAuth, async (req, res) => {
 router.get('/:id/download', requireAuth, async (req, res) => {
   try {
     const file = await fileService.getFile(req.userId, req.params.id);
-    if (!file || !file.url) return res.status(404).send('File not found');
-
-    const ext = (path.extname(file.originalName || '').slice(1) || '').toLowerCase();
-    const contentType = MIME_MAP[ext] || file.mimeType || 'application/octet-stream';
-
-    const response = await fetch(file.url);
-    // Same reasoning as /view above: never redirect to the raw storage URL.
-    if (!response.ok) {
-      console.error(`[files/download] upstream fetch failed for ${req.params.id}: HTTP ${response.status}`);
-      return res.status(502).send('Stored file is currently unreachable. Please try again.');
+    if (!file) return res.status(404).send('File not found');
+    if (serveLocalFile(res, file, 'attachment')) return;
+    if (file.url && !String(file.url).startsWith('/api/')) {
+      const response = await fetch(file.url);
+      if (!response.ok) {
+        console.error(`[files/download] upstream fetch failed for ${req.params.id}: HTTP ${response.status}`);
+        return res.status(502).send('Stored file is currently unreachable. Please try again.');
+      }
+      const arrayBuffer = await response.arrayBuffer();
+      res.send(Buffer.from(arrayBuffer));
+      return;
     }
-
-    res.setHeader('Content-Type', contentType);
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(file.originalName || 'download')}"`);
-
-    const arrayBuffer = await response.arrayBuffer();
-    res.send(Buffer.from(arrayBuffer));
+    return res.status(404).send('File not found');
   } catch (err) {
     console.error('[files/download] error:', err.message);
     res.status(500).send('Error downloading file: ' + err.message);

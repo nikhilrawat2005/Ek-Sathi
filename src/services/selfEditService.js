@@ -319,7 +319,7 @@ Return ONLY a valid JSON array, no markdown:
 [{ "title": "short title", "file": "path/to/file.js", "oldCode": "...exact current code...", "newCode": "...replacement...", "reason": "why" }]`;
 
   const { text } = await callLLM({
-    role: 'builder',
+    role: 'chat',
     messages: [{ role: 'system', content: prompt }, { role: 'user', content: 'Find safe self-improvements and return the JSON array.' }],
     temperature: 0.2,
     max_tokens: 4000,

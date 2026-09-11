@@ -593,31 +593,14 @@ router.post('/', requireAuth, async (req, res) => {
       }
     }
 
-    const mentionsStalker = /\b(stalk|stalking|researched profile|target profile)\b/i.test(promptMessage);
-    if (mentionsStalker) {
-      const stalkers = await require('../services/stalkingService').listProfiles(req.userId).catch(() => []);
-      if (stalkers && stalkers.length) {
-        contextBlocks.push(`🔎 DEEP RESEARCH WORKSPACE (Researched target profiles):\n${stalkers.map(s => `- ${s.name} [${s.status}]${s.link ? ` ${s.link}` : ''}`).join('\n')}`);
-      }
-    }
-
     if (webpageBlock) {
       contextBlocks.push(webpageBlock);
     }
     if (githubBlock && githubBlock.length) {
       githubBlock.forEach(b => contextBlocks.push(b));
     }
-    const wantsSelfEdit = /improve (yourself|your code|khud)|self.?edit|self.?improve|apne aap ko|khud ko|code review karo|bug fix karo|better banao/i.test(promptMessage);
-    if (wantsSelfEdit) {
-      const selfEdit = require('../services/selfEditService');
-      selfEdit.runSelfReview(req.userId, { autoApply: false }).catch(err => console.error('Self-review error:', err.message));
-      contextBlocks.push(`🧬 SELF-EDIT MODE (Master asked you to improve yourself): a code self-review just started in the background. Tell Master it's running and that he'll get edit proposals as 🔔 notifications — he can approve/apply them in the HQ → Self-Edit workspace. Don't fabricate which edits were found yet.`);
-    }
     if (autoStats) {
       contextBlocks.push(`📊 AUTO-ANALYSIS of the data Master Nikhil just provided (exact computed values):\n${autoStats}`);
-    }
-    if (req.body.collab) {
-      contextBlocks.push(`🤝 BOB + BUILDER COLLAB MODE (Master Nikhil ne ise ON kiya hai): Master ne explicitly allow kiya hai ki tum Bob the Builder ke saath milke kaam kar sakte ho. Jab bhi coding/project/planning ka kaam ho aur Builder ki help useful lage, apna kaam ek chhota \`\`\`builder {title,instruction} \`\`\` block bana kar Builder ko delegate kar sakte ho. Apne reply me phir batana ki tumne Builder ko kya assign kiya aur kyun. Jab tak Master ye mode ON rakhe, Builder collaboration allowed hai.`);
     }
 
     const binaryFileIntent = detectBinaryFileIntent(promptMessage);
@@ -660,7 +643,7 @@ To save a memory fact, output a clean memory block at the END of your response:
 \`\`\`memory
 { "fact": "Nikhil ne 3 LeetCode problems solve ki hain: Two Sum, Remove Element, Contains Duplicate", "category": "main" }
 \`\`\`
-Categories: "habits" (habits/personal bio), "main" (core progress/stats/facts), "builder" (tech stack/architecture), "hackathons" (hackathon details).
+Categories: "habits" (habits/personal bio), "main" (core progress/stats/facts), "hackathons" (hackathon details).
 You can output one or more \`\`\`memory ... \`\`\` blocks whenever new milestones or facts need to be saved.
 RULE: If you say "I've updated my memory" or "Got it, I'll remember", you MUST emit a \`\`\`memory block — no exceptions.`
     ];
@@ -704,16 +687,7 @@ When Master asks to schedule something, output a \`\`\`schedule block:
 \`\`\`schedule\n{ "title": "Task Name", "prompt": "Detailed task instructions", "scheduledAt": "ISO_8601_IST_STRING", "repeat": "none|daily|weekly" }\n\`\`\``);
     }
 
-    // 6. BUILDER DELEGATION MODULE (~140 tokens — only if explicit delegation requested)
-    const wantsBuilder = req.body.collab || /(?:delegate to builder|builder ko assign|builder se code karwao|builder ko task de do|architect blueprint banao)/i.test(promptMessage);
-    if (wantsBuilder) {
-      promptModules.push(`━━━ 🏗️ BUILDER DELEGATION ━━━
-🚨 CRITICAL RULE: Only output a \`\`\`builder block when you are assigning an immediate, complete instruction to Bob the Builder.
-\`\`\`builder\n{ "title": "Project Title", "instruction": "Full detailed context and instructions for Bob the Builder" }\n\`\`\`
-NEVER output an empty \`\`\`builder block or quote it in casual conversation sentences.`);
-    }
-
-    // 7. HACKATHON WORKSPACE MODULE (~120 tokens — only if hackathon mentioned)
+    // 6. HACKATHON WORKSPACE MODULE (~120 tokens — only if hackathon mentioned)
     const wantsHackathon = /(?:hackathon|sih|devpost|unstop|vicodathon|prize pool|competition)/i.test(promptMessage);
     if (wantsHackathon) {
       promptModules.push(`━━━ 🏆 HACKATHON WORKSPACE ━━━
