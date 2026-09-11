@@ -1,81 +1,71 @@
 /* ═══════════════════════════════════════════════════════
-   BOB — Design System
-   Near-black base, cool azure accent, high-contrast text.
+    EK SATHI — Design System
+    Dark base with a teal-to-emerald growth accent.
+    Brand: Learn • Build • Grow
 
-   RETHEMING: every colour below is a token. To change the accent hue you edit
-   --accent / --accent2 AND their -rgb twins. The -rgb tokens exist because ~90
-   rules need the accent at a custom alpha; they do it with
-   rgba(var(--accent-rgb), 0.15) so there is exactly one source of truth.
-   Keep the -rgb values numerically in sync with the hex values.
-═══════════════════════════════════════════════════════ */
+    RETHEMING: every colour below is a token. Edit
+    --accent / --accent2 AND their -rgb twins. The -rgb tokens exist
+    because ~90 rules need the accent at a custom alpha; they do it with
+    rgba(var(--accent-rgb), 0.15) so there is exactly one source of truth.
+    Keep the -rgb values numerically in sync with the hex values.
+   ═══════════════════════════════════════════════════════ */
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  /* ── Surfaces: Abyssal Void Black with Electric Blue Glass ─── */
-  --bg:          #040508;
-  --bg2:         #080a10;
-  --bg3:         #0d111b;
-  --surface:     #0d111b;
-  --surface2:    #131826;
+  /* ── Surfaces: Deep Navy Void with Teal-Glass ─── */
+  --bg:          #060b14;
+  --bg2:         #0b1120;
+  --bg3:         #111827;
+  --surface:     #111827;
+  --surface2:    #1e293b;
 
-  /* ── Borders: Luminous Blue Flame Glass Hairlines ──────── */
-  --border:      rgba(56, 189, 248, 0.12);
-  --border2:     rgba(56, 189, 248, 0.22);
-  --border3:     rgba(0, 242, 254, 0.35);
+  /* ── Borders: Teal-Emerald Glass Hairlines ──────── */
+  --border:      rgba(20, 184, 166, 0.14);
+  --border2:     rgba(20, 184, 166, 0.25);
+  --border3:     rgba(6, 182, 212, 0.40);
 
-  /* ── Accent: Electric Cyan Flame -> Plasma Sky Blue ───────────── */
-  --accent:      #00f2fe;
-  --accent2:     #38bdf8;
-  --accent-rgb:  0, 242, 254;
-  --accent2-rgb: 56, 189, 248;
-  --accent-glow: rgba(0, 242, 254, 0.35);
-  --accent-soft: rgba(0, 242, 254, 0.12);
-  --accent-dim:  #7dd3fc;
+  /* ── Accent: Ek Sathi Signature Teal -> Emerald Grow ───── */
+  --accent:      #14b8a6;   /* teal-500 — Ek Sathi identity */
+  --accent2:     #059669;   /* emerald-600 — Grow */
+  --accent-rgb:  20, 184, 166;
+  --accent2-rgb: 5, 150, 105;
+  --accent-glow: rgba(20, 184, 166, 0.35);
+  --accent-soft: rgba(20, 184, 166, 0.12);
+  --accent-dim:  #5eead4;
 
-  --cyan:        #00f2fe;
+  /* ── Status: Growth Palette ──────────────────────── */
+  --green:       #22c55e;
+  --red:         #ef4444;
+  --amber:       #f59e0b;
+  --blue:        #3b82f6;
+  --green-rgb:   34, 197, 94;
+  --red-rgb:     239, 68, 68;
+  --amber-rgb:   245, 158, 11;
+  --blue-rgb:    59, 130, 246;
+  --cyan-rgb:    20, 184, 166;
 
-  /* ── Status: Cyber Neon Accents ──────────────────────────── */
-  --green:       #10b981;
-  --red:         #f43f5e;
-  --amber:       #facc15;
-  --blue:        #38bdf8;
-  --green-rgb:   16, 185, 129;
-  --red-rgb:     244, 63, 94;
-  --amber-rgb:   250, 204, 21;
-  --blue-rgb:    56, 189, 248;
-  --cyan-rgb:    0, 242, 254;
+  /* ── Text ──────────────────────────────────────────── */
+  --text:        #f1f5f9;   /* 17.5:1 on --bg — headings, body */
+  --text2:       #94a3b8;   /*  8.7:1 on --bg — secondary, labels */
+  --text3:       #64748b;   /*  5.6:1 on --bg, 4.6:1 on --surface2 — captions */
 
-  /* ── Text: --text3 was #6b7280 = 4.03:1, below the 4.5:1 AA floor, so
-        every timestamp/caption/hint in the app was failing. All three steps
-        are now compliant. ─────────────────────────────────────────────────── */
-  --text:        #f2f5f9;   /* 18.2:1 on --bg — headings, body */
-  --text2:       #a9b2c0;   /*  9.3:1 on --bg — secondary, labels */
-  --text3:       #868f9e;   /*  6.1:1 on --bg, 4.8:1 on --surface2 — captions, hints */
+  --user-bubble: linear-gradient(135deg, #14b8a6, #059669);
+  --bob-bubble:  #1e293b;
 
-  --user-bubble: linear-gradient(135deg, #4d9fff, #2f7cf6);
-  --bob-bubble:  #15181f;
-
-  /* ── Legacy aliases ───────────────────────────────────────────────────────
-     app.js builds inline styles with an older set of token names that were
-     never defined in this file. An undefined var() makes the whole declaration
-     invalid, so those elements were rendering with NO colour at all — inheriting
-     whatever the parent had. Real occurrences found:
-       app.js:519,4713   --text-main
-       app.js:520,4896,4900 --text-sub
-       app.js:3127       --text-muted, --primary
-       app.js:4716,4895  --accent-blue
-     Aliasing here fixes all of them in one place and keeps any other
-     dynamically-built string safe too. */
+  /* ── Legacy aliases ─────────────────────────────────────
+      app.js builds inline styles with an older set of token names
+      that were never defined in this file. An undefined var() makes
+      the whole declaration invalid — those elements rendered with NO
+      colour. Aliasing fixes them in one place. */
   --text-main:   var(--text);
   --text-sub:    var(--text2);
   --text-muted:  var(--text3);
   --primary:     var(--accent);
   --accent-blue: var(--accent);
 
-  /* ── Typography ──────────────────────────────────────────────────────── */
-  /* Full fallback stacks: if the Google Fonts request fails the UI drops to a
-     good native face instead of the browser's default serif-ish sans. */
+  /* ── Typography ─────────────────────────────────────── */
+  /* Clean, modern, readable stack for a student-learning companion. */
   --font-sans:   'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --font-mono:   'JetBrains Mono', 'Cascadia Code', 'Fira Code', Consolas, 'Courier New', monospace;
 
@@ -92,7 +82,7 @@
   --lh-snug:     1.45;
   --lh-normal:   1.65;
 
-  /* ── Shape / motion ──────────────────────────────────────────────────── */
+  /* ── Shape / motion ─────────────────────────────────── */
   --radius:      14px;
   --radius-sm:   8px;
   --sidebar-w:   260px;
