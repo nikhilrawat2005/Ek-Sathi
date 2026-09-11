@@ -511,7 +511,7 @@ async function chatSend(userId, hackId, message) {
   const recent = await memory.getRecentMessages(userId, sid, 20);
   const context = await buildHackContext(userId, updatedHack);
 
-  const systemPrompt = `You are Bob, Master Nikhil's personal AI, inside the "${hack.title}" HACKATHON WORKSPACE.
+  const systemPrompt = `You are Ek Sathi, Master Nikhil's personal AI companion, inside the "${hack.title}" HACKATHON WORKSPACE.
 This chat is STRICTLY about this hackathon only. Never bring up vault, stalking, other hackathons, or other chats.
 Help with ideation, planning, team formation, tech stack, implementation, submission prep, and timelines.
 

@@ -34,6 +34,61 @@ function _allVisibleKeys() {
   return _rawKeys.slice();
 }
 
+// ── Hot-reload: re-scan process.env and merge any new keys into the bag ──
+let _lastReload = 0;
+const RELOAD_INTERVAL_MS = 30000; // check every 30s max
+
+function reloadKeys() {
+  const now = Date.now();
+  if (now - _lastReload < RELOAD_INTERVAL_MS) return;
+  _lastReload = now;
+
+  let added = 0;
+  for (let i = 1; i <= 99; i++) {
+    const envName = `OPENROUTER_API_KEY${i}`;
+    const raw = process.env[envName];
+    if (raw && raw.trim() && !_rawKeys.includes(raw.trim())) {
+      _rawKeys.push(raw.trim());
+      _keyEnvName.set(raw.trim(), envName);
+      added++;
+    }
+  }
+  // Also check the un-numbered alias
+  if (process.env.OPENROUTER_API_KEY && process.env.OPENROUTER_API_KEY.trim()) {
+    const k = process.env.OPENROUTER_API_KEY.trim();
+    if (!_rawKeys.includes(k)) { _rawKeys.push(k); _keyEnvName.set(k, 'OPENROUTER_API_KEY'); added++; }
+  }
+  if (process.env.BOB_API_KEY && process.env.BOB_API_KEY.trim()) {
+    const k = process.env.BOB_API_KEY.trim();
+    if (!_rawKeys.includes(k)) { _rawKeys.unshift(k); _keyEnvName.set(k, 'BOB_API_KEY'); added++; }
+  }
+
+  if (added > 0) {
+    // Merge new keys into the live bag
+    for (const k of _rawKeys) {
+      if (!_bobBag.keys.find(x => x.key === k)) {
+        const entry = {
+          key: k,
+          keyId: _keyIdOf(k) || `KEY_${_bobBag.keys.length + 1}`,
+          last4: k.slice(-4),
+          role: 'EKSATHI',
+          status: 'active',
+          tokens: 0,
+          lastBalance: 0,
+          lastUsed: 0,
+          lastCheck: 0,
+          cooldownUntil: 0,
+          lastError: null,
+        };
+        _bobBag.keys.push(entry);
+        _bobBag.queueA.push(entry);
+        console.log(`[llmService] Hot-reload: added key ...${entry.last4} (${entry.keyId})`);
+      }
+    }
+    console.log(`[llmService] Ek Sathi Key Bag → ${_rawKeys.length} keys (${added} new)`);
+  }
+}
+
 function _keyIdOf(key) {
   const envVar = _keyEnvName.get(key);
   if (envVar) {
@@ -472,6 +527,7 @@ async function callOpenRouterDirect({
   persona,
 }) {
   await _ensureInit();
+  reloadKeys(); // hot-reload any new keys from .env
   const hasImages = Array.isArray(imageUrls) && imageUrls.length > 0;
   let finalMessages = Array.isArray(messages) ? messages : [];
 

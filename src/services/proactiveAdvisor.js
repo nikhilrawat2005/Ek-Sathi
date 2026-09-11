@@ -72,7 +72,7 @@ async function generateProactiveGreeting(userId, userEmail) {
       vaultHint
     ].filter(Boolean).join('\n');
 
-    const prompt = `You are Bob, Master Nikhil's personal AI assistant.
+    const prompt = `You are Ek Sathi, Master Nikhil's personal AI companion.
 Master Nikhil just opened the app. Generate a short, warm, proactive welcome greeting (2-3 sentences max).
 Rules:
 1. Greet Master Nikhil warmly by name.
