@@ -590,37 +590,60 @@ async function askGitHub() {
   }
 }
 
-/* ── Study: Website ────────────────────────────────────── */
+/* ── Study: Website (beast deep-scan) ───────────────────── */
 async function analyzeWebsite() {
   const url = $('website-input').value.trim();
   if (!url) return;
   const res = $('website-results');
-  res.innerHTML = '<div class="empty-msg">⏳ Website decode ho raha hai…</div>';
+  res.innerHTML = '<div class="empty-msg">⏳ Deep website scrape ho raha hai — home + internal pages + CSS scan (≈20-30s)…</div>';
   try {
     const data = await apiFetch('/api/study/website', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
     if (data.status !== 'ok') {
-      res.innerHTML = `<div class="empty-msg">⚠️ ${escHtml(data.message || 'Decode nahi ho paya')}</div>`;
+      res.innerHTML = `<div class="empty-msg">⚠️ ${escHtml(data.message || 'Website scrape nahi ho paya')}</div>`;
       return;
     }
-    const d = data.decode || {};
-    const arch = d.architecture || {};
+    const d = data;
+    const stack = d.stack || {};
+    const design = d.design || {};
+    const swatches = (design.colors || []).map((c, i) => {
+      const token = (design.tokens || []).find(t => t.color === c.hex);
+      return `<span class="site-swatch" style="background:${c.hex}" title="${escHtml(c.hex)} ×${c.count}${token ? ' · --' + escHtml(token.name) : ''}">
+        <span class="site-swatch-label">${escHtml(c.hex)}${token ? ' <b>--' + escHtml(token.name) + '</b>' : ''}</span></span>`;
+    }).join('');
+
+    const chipRow = (label, items) => {
+      const arr = Array.isArray(items) ? items.filter(Boolean) : [];
+      return arr.length ? `<div class="site-chip-row"><span class="site-chip-label">${label}</span>${arr.map(x => `<span class="site-chip">${escHtml(String(x))}</span>`).join('')}</div>` : '';
+    };
+
+    const fontsRow = (design.fonts || []).map(f => `<span class="site-chip site-chip-font">🔤 ${escHtml(f.name)}<i> ×${f.weight}</i></span>`).join('');
+    const pagesRow = (d.pages || []).slice(0, 12).map(p => {
+      const u = p.url || '';
+      return `<a class="site-page-link" href="${escHtml(u)}" target="_blank" rel="noopener">${escHtml(p.title || u)} ↗</a>`;
+    }).join('');
+
     res.innerHTML = `
-      <div class="repo-card">
-        <div class="repo-card-head">
-          <h3>🌐 ${escHtml(d.title || d.url || url)}</h3>
-          <a class="btn-small" href="${escHtml(d.url || url)}" target="_blank" rel="noopener">Open ↗</a>
+      <div class="gh-profile-overview">
+        <div class="gh-profile-top">
+          ${d.favicon ? `<img class="site-favicon" src="${escHtml(d.favicon)}" onerror="this.style.display='none'" alt=""/>` : '<span class="site-favicon site-favicon-empty">🌐</span>'}
+          <div class="gh-profile-info">
+            <h3 style="margin:0 0 2px">🌐 ${escHtml(d.title || d.url || url)}</h3>
+            ${d.description ? `<p class="ws-item-sub" style="margin:0 0 4px">${escHtml(d.description)}</p>` : ''}
+            <p class="ws-item-sub" style="margin:0">${escHtml(d.scrapeMeta || '')} ${(d.jsonLdTypes || []).length ? '· <b>JSON-LD:</b> ' + escHtml(d.jsonLdTypes.slice(0, 4).join(', ')) : ''}</p>
+          </div>
         </div>
-        ${d.description ? `<p class="ws-item-sub">${escHtml(d.description)}</p>` : ''}
-        <div class="repo-stats">
-          ${(arch.framework || []).length ? `<span>🧩 ${escHtml(arch.framework.join(', '))}</span>` : ''}
-          ${(arch.styling || []).length ? `<span>🎨 ${escHtml(arch.styling.join(', '))}</span>` : ''}
-          <span>✏️ ${(d.headings || []).length} headings</span>
-          <span>🔗 ${(d.links || []).length} links</span>
-        </div>
+        ${chipRow('🧩 Frameworks', [...(stack.frameworks || []), ...(stack.cms || []), ...(stack.ssg || [])])}
+        ${chipRow('🎨 Styling', stack.styling)}
+        ${chipRow('📚 Libraries', stack.libraries)}
+        ${chipRow('⚙️ Runtime', stack.runtime)}
+        ${swatches ? `<div class="site-chip-row"><span class="site-chip-label">🎨 Color palette (${(design.colors || []).length})</span><span class="site-swatch-row">${swatches}</span></div>` : ''}
+        ${fontsRow ? `<div class="site-chip-row"><span class="site-chip-label">🔤 Fonts (${(design.fonts || []).length})</span>${fontsRow}</div>` : ''}
+        ${pagesRow ? `<div class="site-chip-row site-pages-row"><span class="site-chip-label">📄 Pages (${(d.pages || []).length})</span><span class="site-pages">${pagesRow}</span></div>` : ''}
+        <div class="site-analysis">${d.analysis ? mdToHtml(d.analysis) : '<p class="ws-item-sub">Bhaasha analysis generate nahi ho paya — upar ke extracted facts dekh lo.</p>'}</div>
       </div>`;
     $('website-qa').style.display = 'flex';
     $('website-domain').textContent = d.title || d.url || url;
-    $('website-arch').textContent = (arch.framework || []).join(', ') || 'website analysis';
+    $('website-arch').textContent = [...(stack.frameworks || []), ...(stack.cms || []), ...(stack.styling || [])].slice(0, 4).join(', ') || 'website deep-scan';
     $('website-messages').innerHTML = '';
   } catch (err) {
     res.innerHTML = `<div class="empty-msg">⚠️ ${escHtml(err.message)}</div>`;

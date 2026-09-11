@@ -15,6 +15,7 @@ const router = express.Router();
 const { requireAuth } = require('../middleware/auth');
 const repo = require('../services/repoService');
 const crawler = require('../services/crawlerService');
+const website = require('../services/websiteService');
 
 // POST /api/study/github { url | text }
 router.post('/github', requireAuth, async (req, res) => {
@@ -102,28 +103,37 @@ router.post('/github/explain', requireAuth, async (req, res) => {
   }
 });
 
-// POST /api/study/website { url }
+// POST /api/study/website { url } → BEAST deep-scan of the whole site:
+// home + internal pages + CSS → stack / fonts / colors / LLM narrative
 router.post('/website', requireAuth, async (req, res) => {
   try {
     const url = String((req.body && req.body.url) || '').trim();
     if (!url) return res.status(400).json({ error: 'URL is required.' });
-    const decode = await crawler.scrapeURL(url, { inspectArchitecture: true });
-    res.json({ status: 'ok', decode });
+    const result = await website.analyzeWebsite(url);
+    if (result.status === 'error') {
+      return res.status(200).json({ status: 'error', message: result.message || 'Site scrape nahi ho paya.', hint: result.hint });
+    }
+    res.json({ status: 'ok', ...result });
   } catch (err) {
     res.status(500).json({ error: err.message, hint: 'Only public http(s) URLs are allowed.' });
   }
 });
 
-// POST /api/study/website/ask { url, question } → Q&A from decoded website content
+// POST /api/study/website/ask { url, question } → LLM Q&A over the whole deep-scraped site
 router.post('/website/ask', requireAuth, async (req, res) => {
   try {
     const url = String((req.body && req.body.url) || '').trim();
     const question = String((req.body && req.body.question) || '').trim();
     if (!url) return res.status(400).json({ error: 'URL is required.' });
     if (!question) return res.status(400).json({ error: 'Sawaal likho (question required).' });
-    const decode = await crawler.scrapeURL(url, { inspectArchitecture: true });
-    const answer = answerSiteQuestion(decode, question);
-    res.json({ status: 'ok', question, url: decode.url, answer });
+    try {
+      const r = await website.askWebsiteQuestion(url, question);
+      res.json({ status: 'ok', question, url: r.site.url, answer: r.answer });
+    } catch (err) {
+      // deterministic fallback over a single-page decode
+      const decode = await crawler.scrapeURL(url, { inspectArchitecture: true });
+      res.json({ status: 'ok', question, url: decode.url, answer: answerSiteQuestion(decode, question) });
+    }
   } catch (err) {
     res.status(500).json({ error: err.message, hint: 'Only public http(s) URLs are allowed.' });
   }
