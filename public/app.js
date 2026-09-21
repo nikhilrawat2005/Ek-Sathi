@@ -287,12 +287,12 @@ function bindWelcomeChips() {
 }
 
 /* ── Discovery: Hackathon Lab ──────────────────────────── */
-const DISCOVER_STATUS = $('scan-status');
 
 function setScanStatus(text, busy) {
-  if (!DISCOVER_STATUS) return;
-  DISCOVER_STATUS.textContent = text;
-  DISCOVER_STATUS.classList.toggle('busy', !!busy);
+  const el = $('scan-status');
+  if (!el) return;
+  el.textContent = text;
+  el.classList.toggle('busy', !!busy);
 }
 
 async function loadDiscoverCards() {
@@ -347,9 +347,16 @@ function filteredCards() {
   });
 }
 
+function fmtDate(val) {
+  if (!val) return '';
+  const d = new Date(typeof val === 'number' ? val : String(val).slice(0, 10));
+  if (isNaN(d)) return String(val).slice(0, 10);
+  return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
 function cardDateLabel(c) {
-  if (c.registrationDeadline) return `⏰ Reg closes ${String(c.registrationDeadline).slice(0, 10)}`;
-  if (c.startDate) return `🚀 ${String(c.startDate).slice(0, 10)} ${c.endDate ? '→ ' + String(c.endDate).slice(0, 10) : ''}`;
+  if (c.registrationDeadline) return `⏰ Reg closes ${fmtDate(c.registrationDeadline)}`;
+  if (c.startDate) return `🚀 ${fmtDate(c.startDate)}${c.endDate ? ' → ' + fmtDate(c.endDate) : ''}`;
   return '';
 }
 

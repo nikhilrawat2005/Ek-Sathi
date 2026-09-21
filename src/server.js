@@ -11,7 +11,9 @@ const studyRoute         = require('./routes/study');
 
 const app = express();
 
-app.use(cors({ origin: process.env.ALLOWED_ORIGIN || '*' }));
+// Local dev: allow all origins so the frontend loads fine regardless of
+// whether it's opened via localhost, 127.0.0.1, or a LAN IP.
+app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '2mb' }));
 
 // Minimal security headers (no extra dependency)
