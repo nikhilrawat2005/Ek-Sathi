@@ -27,9 +27,9 @@ const hackathonService = require('./hackathonService');
 
 // ── Constants ────────────────────────────────────────────
 const DISCOVERY_INTERVAL_MS = 4 * 24 * 60 * 60 * 1000; // 4 days
-const MAX_CARDS = 20; // max cards shown at one time
-const MAX_HACKATHONS = 14; // hackathons get priority but leave room for internships
-const MAX_INTERNSHIPS = 6; // guaranteed internship slots in each batch
+const MAX_CARDS = 30; // max cards shown at one time
+const MAX_HACKATHONS = 20; // hackathons get priority but leave room for internships
+const MAX_INTERNSHIPS = 10; // guaranteed internship slots in each batch
 const SCRAPE_TIMEOUT = 15000; // 15s per platform
 
 // CSE domain keywords for quick pre-filter
@@ -195,7 +195,7 @@ async function scrapeUnstop() {
   const items = [];
   try {
     // 1. First attempt: Unstop public API
-    const apiUrl = 'https://unstop.com/api/public/opportunity/search-result?opportunity=hackathons&per_page=20';
+    const apiUrl = 'https://unstop.com/api/public/opportunity/search-result?opportunity=hackathons&per_page=30';
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), SCRAPE_TIMEOUT);
     const res = await fetch(apiUrl, {
