@@ -5,7 +5,10 @@
    ═══════════════════════════════════════════════════════════ */
 'use strict';
 
-const API = '';               // relative API base (same origin)
+// Automatically determine API base: if opened via file:// or another port, fallback gracefully
+const API = (typeof window !== 'undefined' && window.location && window.location.origin && window.location.origin.startsWith('http'))
+  ? ''
+  : 'http://localhost:3000';
 const TOKEN = 'dev-local';    // local-only auth token
 
 /* ── State ─────────────────────────────────────────────── */
@@ -20,7 +23,12 @@ const escHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;
 /* ── API helpers ───────────────────────────────────────── */
 async function apiFetch(url, opts = {}) {
   const headers = { Authorization: `Bearer ${TOKEN}`, ...(opts.headers || {}) };
-  const res = await fetch(API + url, { ...opts, headers });
+  let res;
+  try {
+    res = await fetch(API + url, { ...opts, headers });
+  } catch (netErr) {
+    throw new Error(`Failed to connect to backend server (${API || 'localhost:3000'}). Make sure "npm run dev" is running.`);
+  }
   let data = null;
   try { data = await res.json(); } catch (e) { /* non-JSON */ }
   if (!res.ok) throw new Error((data && data.error) || `HTTP ${res.status}`);

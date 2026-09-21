@@ -542,7 +542,7 @@ Reply with ONLY a JSON array of numbers representing the indices (1-based) of ha
 async function fetchPageSnippet(url) {
   if (!url || !url.startsWith('http')) return '';
   try {
-    const html = await safeFetch(url, 9000);
+    const html = await safeFetch(url, 4000);
     const $ = cheerio.load(html);
     $('script, style, nav, footer, header, noscript, svg').remove();
 
@@ -551,8 +551,8 @@ async function fetchPageSnippet(url) {
     if (!content || content.length < 200) {
       content = $('body').text().replace(/\s+/g, ' ').trim();
     }
-    // Truncate to first 3500 chars to fit in LLM prompt nicely
-    return content.slice(0, 3500);
+    // Truncate to first 1500 chars to fit in LLM prompt nicely & respond fast
+    return content.slice(0, 1500);
   } catch (e) {
     return '';
   }
@@ -563,6 +563,29 @@ async function fetchPageSnippet(url) {
  * For each filtered item, fetch real page content, generate deep build details + prize basis
  */
 async function enrichItem(item) {
+  // Internships already have structure and don't need heavy LLM re-enrichment
+  if (item.type === 'internship') {
+    return {
+      ...item,
+      summary: `${item.title} at ${item.company || 'Tech Company'}.`,
+      whatToBuild: `Software engineering internship focusing on development, code quality, and collaboration.`,
+      prize: item.stipend || 'Competitive Stipend',
+      prizeBasis: 'Monthly stipend based on performance and role commitment.',
+      hasCertificates: true,
+      certificatesInfo: 'Internship completion certificate & letter of recommendation upon completion.',
+      fee: 'Free Application',
+      mode: item.mode || 'online',
+      location: item.location || 'Remote / Hybrid',
+      seatsStatus: 'Actively Hiring',
+      tags: item.tags || ['Internship', 'IT'],
+      teamSize: 'Individual',
+      eligibility: 'College students and recent graduates',
+      registrationDeadline: null,
+      startDate: null,
+      endDate: null,
+    };
+  }
+
   const todayStr = new Date().toISOString().slice(0, 10);
   const cleanRawPrize = stripHtml(item.prize || '');
   
@@ -594,18 +617,18 @@ ${pageSnippet || 'Webpage content could not be retrieved directly; use hackathon
 Generate JSON with these exact fields:
 {
   "summary": "1-2 sentences giving high-level hook: what this hackathon is and the main challenge goal.",
-  "whatToBuild": "3-4 concise lines describing EXPLICITLY what participants need to build (e.g. project type, tech stack, APIs or SDKs to use, submission deliverables like working demo/video/GitHub PR).",
+  "whatToBuild": "2-3 concise lines describing what participants need to build.",
   "prize": "Clean prize string (e.g. '$10,000 USD' or '₹2,50,000' or 'Swags & Mentorship'). Clean all HTML tags.",
-  "prizeBasis": "How prizes are awarded / judging criteria (e.g. 'Judged on Technical Implementation, Innovation, Practical Impact, and Working Demo Video').",
+  "prizeBasis": "How prizes are awarded / judging criteria.",
   "hasCertificates": true,
-  "certificatesInfo": "Yes (Participation certificate for all valid submissions) OR No / Cash & Swags only",
+  "certificatesInfo": "Yes (Certificate for valid submissions) OR No",
   "fee": "Free Entry or registration fee amount",
   "mode": "online | offline | hybrid",
   "location": "City/venue name if offline, or 'Virtual / Global' if online",
   "seatsStatus": "Open | Filling Fast | Limited",
-  "tags": ["2-4 specific tech tags like AI/ML, Web Dev, Mobile App, DSA"],
+  "tags": ["2-4 specific tech tags"],
   "teamSize": "e.g. 1-4 Members, Solo or Team",
-  "eligibility": "1 concise sentence: who can participate (e.g. Students & developers worldwide)",
+  "eligibility": "1 concise sentence: who can participate",
   "registrationDeadline": "YYYY-MM-DD or null",
   "startDate": "YYYY-MM-DD or null",
   "endDate": "YYYY-MM-DD or null"
@@ -613,7 +636,7 @@ Generate JSON with these exact fields:
         },
       ],
       temperature: 0.2,
-      max_tokens: 700,
+      max_tokens: 500,
     });
 
     const parsed = JSON.parse(res.text.replace(/```json|```/g, '').trim());
@@ -658,6 +681,24 @@ Generate JSON with these exact fields:
       endDate: null,
     };
   }
+}
+
+// Helper to run promises with concurrency limit
+async function mapConcurrent(items, limit, fn) {
+  const results = [];
+  const executing = [];
+  for (const item of items) {
+    const p = Promise.resolve().then(() => fn(item));
+    results.push(p);
+    if (limit <= items.length) {
+      const e = p.then(() => executing.splice(executing.indexOf(e), 1));
+      executing.push(e);
+      if (executing.length >= limit) {
+        await Promise.race(executing);
+      }
+    }
+  }
+  return Promise.all(results);
 }
 
 // ── Main Discovery Runner ─────────────────────────────────
@@ -737,12 +778,8 @@ async function runDiscovery(userId, force = false) {
   // 5. Limit to top MAX_CARDS
   const toAdd = llmFiltered.slice(0, MAX_CARDS);
 
-  // 6. Enrich each item (LLM summary + structured data)
-  const enriched = [];
-  for (const item of toAdd) {
-    const rich = await enrichItem(item);
-    enriched.push(rich);
-  }
+  // 6. Enrich items with concurrency limit of 5 for speed
+  const enriched = await mapConcurrent(toAdd, 5, (item) => enrichItem(item));
 
   // 7. Save to Firestore
   const coll = discoveryColl(userId);
