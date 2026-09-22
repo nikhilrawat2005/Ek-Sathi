@@ -409,6 +409,7 @@ function renderDiscoverGrid() {
         <div class="d-card-foot">
           ${c.link ? `<a class="d-link" href="${escHtml(c.link)}" target="_blank" rel="noopener">🔗 View details ↗</a>` : ''}
           <div class="d-card-actions">
+            <button class="btn-ghost" data-discuss="${escHtml(c.id)}">💬 Discuss</button>
             <button class="btn-ghost" data-save="${escHtml(c.id)}">💾 Save</button>
             <button class="btn-ghost-red" data-dismiss="${escHtml(c.id)}">✕ Dismiss</button>
           </div>
@@ -429,6 +430,10 @@ function renderDiscoverGrid() {
       await apiFetch(`/api/hackathons/discover/${id}/dismiss`, { method: 'POST' });
       await loadDiscoverCards();
     } catch (err) { alert('Dismiss failed: ' + err.message); }
+  }));
+  grid.querySelectorAll('[data-discuss]').forEach((b) => b.addEventListener('click', () => {
+    const card = discoverCards.find((x) => x.id === b.dataset.discuss);
+    if (card) openContextChat(subjectFromCard(card), CC_SUGGEST[card.type || 'hackathon'] || CC_SUGGEST.hackathon);
   }));
 }
 
@@ -655,11 +660,14 @@ async function analyzeWebsite() {
         ${fontsRow ? `<div class="site-chip-row"><span class="site-chip-label">🔤 Fonts (${(design.fonts || []).length})</span>${fontsRow}</div>` : ''}
         ${pagesRow ? `<div class="site-chip-row site-pages-row"><span class="site-chip-label">📄 Pages (${(d.pages || []).length})</span><span class="site-pages">${pagesRow}</span></div>` : ''}
         <div class="site-analysis">${d.analysis ? mdToHtml(d.analysis) : '<p class="ws-item-sub">Bhaasha analysis generate nahi ho paya — upar ke extracted facts dekh lo.</p>'}</div>
+        <button class="btn-outline cc-open-btn" id="website-discuss-btn">💬 Discuss with Ek Sathi</button>
       </div>`;
     $('website-qa').style.display = 'flex';
     $('website-domain').textContent = d.title || d.url || url;
     $('website-arch').textContent = [...(stack.frameworks || []), ...(stack.cms || []), ...(stack.styling || [])].slice(0, 4).join(', ') || 'website deep-scan';
     $('website-messages').innerHTML = '';
+    const db = $('website-discuss-btn');
+    if (db) db.addEventListener('click', () => openContextChat(websiteSubject(d), CC_SUGGEST.website));
   } catch (err) {
     res.innerHTML = `<div class="empty-msg">⚠️ ${escHtml(err.message)}</div>`;
   }
@@ -696,6 +704,163 @@ function hackMsgInto(container, role, text) {
   container.appendChild(div);
   scrollToBottom(container);
   return div;
+}
+
+/* ── Context Chat drawer (discuss any scraped item) ─────── */
+const CC_TYPE = {
+  hackathon: { icon: '🏆', label: 'Hackathon' },
+  internship: { icon: '💼', label: 'Internship' },
+  website: { icon: '🌐', label: 'Website' },
+  repo: { icon: '📦', label: 'GitHub Repo' },
+};
+const CC_SUGGEST = {
+  hackathon: ['🎯 Isme main kya bana sakta hu?', '💰 Prize aur deadlines kya hain?', '🙋 Kya main participate karu?', '🧰 Konse skills chahiye?'],
+  internship: ['💼 Ye internship kaisi hai?', '📝 Kya skills chahiye iske liye?', '💰 Stipend kitna hai?', '👀 Apply karna chahiye kya?'],
+  website: ['🎯 Is site ka final goal kya hai?', '🧰 Kis tech se bani hai?', '🎨 Fonts aur color palette batao', '📄 Kin pages pe focus karna chahiye?'],
+};
+let _ccSubject = null;
+let _ccMessages = [];
+
+function buildContextChat() {
+  let overlay = $('context-chat');
+  if (overlay) return overlay;
+  overlay = document.createElement('div');
+  overlay.id = 'context-chat';
+  overlay.className = 'cc-overlay';
+  overlay.innerHTML = `
+    <div class="cc-panel">
+      <div class="cc-header">
+        <span class="cc-ico" id="cc-ico">🌐</span>
+        <div class="cc-id">
+          <div class="cc-title" id="cc-title"></div>
+          <div class="cc-sub" id="cc-sub"></div>
+        </div>
+        <button class="cc-close" onclick="closeContextChat()" title="Close">✕</button>
+      </div>
+      <div class="cc-msgs" id="cc-msgs"></div>
+      <div class="cc-chips" id="cc-chips"></div>
+      <div class="cc-input-row">
+        <textarea id="cc-input" class="ws-chat-input" rows="1" placeholder="Ek Sathi se baat karo — Enter se bhejo, Shift+Enter se nayi line…"></textarea>
+        <button class="cc-send" id="cc-send" onclick="ccSend()" title="Send">➤</button>
+      </div>
+    </div>`;
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeContextChat(); });
+  document.body.appendChild(overlay);
+  const inp = overlay.querySelector('#cc-input');
+  inp.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ccSend(); } });
+  inp.addEventListener('input', function () { this.style.height = 'auto'; this.style.height = Math.min(this.scrollHeight, 120) + 'px'; });
+  return overlay;
+}
+
+function openContextChat(subject, suggested) {
+  const meta = CC_TYPE[subject && subject.type] || CC_TYPE.website;
+  _ccSubject = subject;
+  _ccMessages = [];
+  const o = buildContextChat();
+  o.classList.add('open');
+  $('cc-ico').textContent = meta.icon;
+  $('cc-title').textContent = subject && subject.title ? subject.title : 'Discussion';
+  $('cc-sub').textContent = (subject && subject.subtitle) || meta.label;
+  const msgs = $('cc-msgs');
+  msgs.innerHTML = '';
+  const title = subject && subject.title ? subject.title : 'ye topic';
+  hackMsgInto(msgs, 'assistant', `👋 Main **${title}** ki scraped details ke saath discuss kar sakta hu. Jo bhi poochna ho, poocho!`);
+  const chips = $('cc-chips');
+  chips.innerHTML = (suggested && suggested.length ? suggested : CC_SUGGEST[subject && subject.type] || CC_SUGGEST.website)
+    .map((s) => `<button class="cc-chip" data-q="${escHtml(s)}" onclick="ccSend(this.dataset.q)">${escHtml(s)}</button>`).join('');
+  setTimeout(() => { $('cc-input').focus(); }, 80);
+}
+
+function closeContextChat() {
+  const o = $('context-chat');
+  if (o) o.classList.remove('open');
+}
+
+function ccTypingInto(container) {
+  const div = document.createElement('div');
+  div.className = 'ws-msg assistant';
+  div.innerHTML = `<div class="ws-msg-role">Ek Sathi</div><div class="ws-msg-text"><span class="typing-indicator"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="typing-label">soch raha hu…</span></span></div>`;
+  container.appendChild(div);
+  scrollToBottom(container);
+  return div;
+}
+
+async function ccSend(text) {
+  const inp = $('cc-input');
+  const q = typeof text === 'string' ? text.trim() : (inp.value || '').trim();
+  if (!q || !_ccSubject) return;
+  inp.value = '';
+  inp.style.height = 'auto';
+  const msgs = $('cc-msgs');
+  $( 'cc-chips').innerHTML = '';
+  _ccMessages.push({ role: 'user', content: q });
+  hackMsgInto(msgs, 'user', q);
+  const typing = ccTypingInto(msgs);
+  const send = $('cc-send');
+  send.disabled = true;
+  try {
+    const data = await apiFetch('/api/study/discuss', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subject: _ccSubject, messages: _ccMessages }) });
+    typing.remove();
+    if (data.status === 'ok') {
+      _ccMessages.push({ role: 'assistant', content: data.answer });
+      hackMsgInto(msgs, 'assistant', data.answer || '…');
+    } else {
+      hackMsgInto(msgs, 'assistant', '⚠️ ' + (data.message || data.error || 'Jawab nahi mila'));
+    }
+  } catch (err) {
+    typing.remove();
+    hackMsgInto(msgs, 'assistant', '⚠️ ' + err.message);
+  } finally {
+    send.disabled = false;
+    inp.focus();
+  }
+}
+
+function subjectFromCard(c) {
+  const isIntern = (c.type || 'hackathon') === 'internship';
+  const parts = [
+    `Type: ${isIntern ? 'Internship' : 'Hackathon'}`,
+    c.platform ? `Platform: ${c.platform}` : '',
+    c.title ? `Title: ${c.title}` : '',
+    c.company ? `Company: ${c.company}` : '',
+    c.summary ? `Summary: ${c.summary}` : '',
+    c.whatToBuild ? `What to build: ${c.whatToBuild}` : '',
+    c.prize ? `${isIntern ? 'Stipend' : 'Prize'}: ${c.prize}` : '',
+    c.mode ? `Mode: ${c.mode}` : '',
+    c.location ? `Location: ${c.location}` : '',
+    c.fee ? `Fee: ${c.fee}` : '',
+    isIntern && c.stipend ? `Stipend: ${c.stipend}` : '',
+    isIntern && c.duration ? `Duration: ${c.duration}` : '',
+    c.seatsStatus ? `Seats: ${c.seatsStatus}` : '',
+    c.teamSize ? `Team size: ${c.teamSize}` : '',
+    c.eligibility ? `Eligibility: ${c.eligibility}` : '',
+    (c.registrationDeadline || c.startDate || c.endDate) ? `Dates: ${c.registrationDeadline || ''}${c.startDate ? ` · ${c.startDate}${c.endDate ? ' → ' + c.endDate : ''}` : ''}` : '',
+    c.tags && c.tags.length ? `Tags: ${c.tags.join(', ')}` : '',
+    c.link ? `Link: ${c.link}` : '',
+  ].filter(Boolean).join('\n');
+  return { type: isIntern ? 'internship' : 'hackathon', title: c.title || 'Untitled', subtitle: c.platform || '', contextText: parts };
+}
+
+function websiteSubject(d) {
+  const stack = d.stack || {};
+  const design = d.design || {};
+  const parts = [
+    d.title ? `Title: ${d.title}` : '',
+    d.url ? `URL: ${d.url}` : '',
+    d.description ? `Description: ${d.description}` : '',
+    d.scrapeMeta ? `Scrape: ${d.scrapeMeta}` : '',
+    d.jsonLdTypes && d.jsonLdTypes.length ? `JSON-LD: ${d.jsonLdTypes.join(', ')}` : '',
+    stack.frameworks && stack.frameworks.length ? `Frameworks: ${stack.frameworks.join(', ')}` : '',
+    stack.cms && stack.cms.length ? `CMS: ${stack.cms.join(', ')}` : '',
+    stack.styling && stack.styling.length ? `Styling: ${stack.styling.join(', ')}` : '',
+    stack.libraries && stack.libraries.length ? `Libraries: ${stack.libraries.join(', ')}` : '',
+    stack.runtime && stack.runtime.length ? `Runtime: ${stack.runtime.join(', ')}` : '',
+    design.colors && design.colors.length ? `Colors: ${design.colors.map((c) => `${c.hex}×${c.count}`).join(', ')}` : '',
+    design.fonts && design.fonts.length ? `Fonts: ${design.fonts.map((f) => f.name).join(', ')}` : '',
+    d.pages && d.pages.length ? `Pages:\n${d.pages.slice(0, 12).map((p) => `• ${p.title || p.url} — ${p.url}`).join('\n')}` : '',
+    d.analysis ? `\nDETAILED ANALYSIS:\n${d.analysis}` : '',
+  ].filter(Boolean).join('\n');
+  return { type: 'website', title: d.title || d.url || 'Website', subtitle: d.url || '', contextText: parts };
 }
 
 /* ── Study bind ────────────────────────────────────────── */

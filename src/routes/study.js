@@ -16,6 +16,7 @@ const { requireAuth } = require('../middleware/auth');
 const repo = require('../services/repoService');
 const crawler = require('../services/crawlerService');
 const website = require('../services/websiteService');
+const contextChat = require('../services/contextChatService');
 
 // POST /api/study/github { url | text }
 router.post('/github', requireAuth, async (req, res) => {
@@ -136,6 +137,19 @@ router.post('/website/ask', requireAuth, async (req, res) => {
     }
   } catch (err) {
     res.status(500).json({ error: err.message, hint: 'Only public http(s) URLs are allowed.' });
+  }
+});
+
+// POST /api/study/discuss { subject:{type,title,subtitle?,contextText?}, messages:[{role,content}] }
+// Context-aware chat about any scraped item (hackathon / internship / website) with Ek Sathi.
+router.post('/discuss', requireAuth, async (req, res) => {
+  try {
+    const { subject, messages } = req.body || {};
+    if (!subject || typeof subject !== 'object') return res.status(400).json({ error: 'subject is required' });
+    const r = await contextChat.discuss(subject, messages);
+    res.json(r);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
