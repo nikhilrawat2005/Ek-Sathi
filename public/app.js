@@ -950,6 +950,11 @@ function resumeSubject(info) {
     `ATS score: ${a.atsScore != null ? a.atsScore + '/100' : 'n/a'} (${a.verdict || ''})${a.jdUsed ? ' — targeted job description audit' : ''}`,
     `Breakdown — Impact & Metrics ${b.impactAndMetrics}/100, Action Verbs ${b.actionVerbs}/100, Formatting & Clarity ${b.formattingAndClarity}/100, Experience Depth ${b.experienceDepth}/100, Skills Relevance ${b.skillsRelevance}/100`,
     `Criteria marks: ${(a.criteria || []).slice(0, 16).map((c) => `${c.label}=${c.score}/${c.max} (${c.status})`).join(' | ')}`,
+    `Dimension grades: ${Object.entries(a.grades || {}).map(([k, v]) => `${k} ${v}`).join(', ') || 'n/a'}`,
+    `Top deductions: ${(a.topDeductions || []).map((d) => `${d.label} (${d.key})`).join(' | ') || 'none'}`,
+    `Improvement potential: ${a.potentialScore != null ? '~' + a.potentialScore + '/100' : 'n/a'}`,
+    `Experience: ${h.totalYears != null ? h.totalYears + ' yr(s)' : 'n/a'} — missing sections: ${(h.missingSections || []).join(', ') || 'none'}${h.summaryPresent === false ? ' (summary missing)' : ''}`,
+    `Social links: ${['github', 'linkedin', 'portfolio'].map((k) => `${k} ${h.social && h.social[k] ? '✅' : '❌'}`).join(', ')}`,
     `Keyword match: ${sm.matched && sm.matched.length ? sm.matched.length + '/' + sm.total + ' (' + sm.source + ')' : 'n/a'} ` + (sm.matched && sm.matched.length ? '— found: ' + sm.matched.slice(0, 12).join(', ') : ''),
     `Sections detected: ${(h.sectionsDetected || []).join(', ') || 'none'}`,
     `Links: ${(a.links || []).map((l) => `${l.status} ${l.url}`).join(' | ') || 'no links found'}`,
@@ -1012,12 +1017,14 @@ function renderResumeAudit(data) {
   const b = a.breakdown || {};
   const h = a.heuristics || {};
   const sm = h.skillMatch || {};
+  const gradeOf = (v) => (v == null ? '—' : v >= 90 ? 'A+' : v >= 80 ? 'A' : v >= 65 ? 'B' : v >= 50 ? 'C' : 'D');
+  const grades = a.grades || {};
   const bars = [
-    ['Impact & Metrics', b.impactAndMetrics, 'quantified bullets ka ratio'],
-    ['Action Verbs', b.actionVerbs, 'strong vs weak opening verbs'],
-    ['Formatting & Clarity', b.formattingAndClarity, 'contact, sections, trailing periods'],
-    ['Experience Depth', b.experienceDepth, 'roles + dates kitne hain'],
-    ['Skills Relevance', b.skillsRelevance, a.jdUsed ? 'target JD keyword match' : 'generic IT skills match'],
+    ['impactAndMetrics', 'Impact & Metrics', b.impactAndMetrics, 'quantified bullets ka ratio'],
+    ['actionVerbs', 'Action Verbs', b.actionVerbs, 'strong vs weak opening verbs'],
+    ['formattingAndClarity', 'Formatting & Clarity', b.formattingAndClarity, 'contact, sections, trailing periods'],
+    ['experienceDepth', 'Experience Depth', b.experienceDepth, 'roles + dates kitne hain'],
+    ['skillsRelevance', 'Skills Relevance', b.skillsRelevance, a.jdUsed ? 'target JD keyword match' : 'generic IT skills match'],
   ];
   const critGroups = RE_GROUP_META.map(([key, title, hint]) => ({
     title, hint,
@@ -1048,13 +1055,14 @@ function renderResumeAudit(data) {
         </div>
       </div>
       <div class="re-bars">
-        ${bars.map(([label, val, hint]) => `
+        ${bars.map(([key, label, val, hint]) => `
           <div class="re-bar">
-            <div class="re-bar-top"><span>${label}</span><span class="re-bar-val" style="color:${scoreTone(val)}">${val}/100</span></div>
+            <div class="re-bar-top"><span>${label}</span><span class="re-bar-val" style="color:${scoreTone(val)}">${val}/100 <span class="re-grade">${grades[key] || gradeOf(val)}</span></span></div>
             <div class="re-bar-track"><div class="re-bar-fill" style="width:${val}%;background:${scoreTone(val)}"></div></div>
             <div class="re-bar-hint">${hint}</div>
           </div>`).join('')}
       </div>
+      ${a.potentialScore != null ? `<div class="re-potential">🔥 Improvement potential: ~${a.potentialScore}/100 agar top deductions fix karein</div>` : ''}
     </div>
 
     <div class="re-card">
@@ -1077,6 +1085,16 @@ function renderResumeAudit(data) {
         </div>`).join('')}
       </div>
     </div>
+
+    ${(a.topDeductions || []).length ? `
+    <div class="re-card">
+      <div class="re-card-title">🔻 Top Deductions — sabse zyada score girane wale</div>
+      ${a.topDeductions.map((d) => `
+        <div class="re-deduct">
+          <div class="re-deduct-head"><span class="re-deduct-key">${escHtml(String(d.key || '').split('.').pop())}</span><span class="re-deduct-label">${escHtml(d.label || '')}</span></div>
+          <div class="re-crit-advice">💡 ${escHtml(d.advice || '')}</div>
+        </div>`).join('')}
+    </div>` : ''}
 
     <div class="re-card">
       <p class="re-summary">${mdToHtml(a.executiveSummary || '')}</p>
