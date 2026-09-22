@@ -8,6 +8,7 @@ const sessionsRoute      = require('./routes/sessions');
 const filesRoute         = require('./routes/files');
 const hackathonsRoute    = require('./routes/hackathons');
 const studyRoute         = require('./routes/study');
+const resumeRoute        = require('./routes/resume');
 
 const app = express();
 
@@ -35,6 +36,7 @@ app.use('/api/sessions',      sessionsRoute);
 app.use('/api/files',         filesRoute);
 app.use('/api/hackathons',    hackathonsRoute);
 app.use('/api/study',         studyRoute);
+app.use('/api/resume',        resumeRoute);
 
 // 404 handler for unknown API routes
 app.use('/api', (req, res) => {
@@ -52,7 +54,18 @@ const PORT = process.env.PORT || 3000;
 // Vercel imports this file as a serverless function (module.exports = app),
 // but app.listen also lets it run standalone locally with `npm run dev`.
 if (require.main === module) {
-  app.listen(PORT, () => console.log(`Ek Sathi backend running on port ${PORT}`));
+  const server = app.listen(PORT, () => {
+    console.log(`Ek Sathi running at http://localhost:${PORT}`);
+    console.log(`Health check: http://localhost:${PORT}/api/health`);
+  });
+
+  server.on('error', (error) => {
+    if (error.code === 'EADDRINUSE') {
+      console.error(`Port ${PORT} is already in use. Stop the existing server or run with a different PORT.`);
+      process.exit(1);
+    }
+    throw error;
+  });
 }
 
 module.exports = app;

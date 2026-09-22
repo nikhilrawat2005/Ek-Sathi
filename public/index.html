@@ -6,7 +6,7 @@
   <title>Ek Sathi — Your AI Companion for Learning & Growth</title>
   <link rel="icon" href="/favicon.png" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/style.css?v=13" />
+  <link rel="stylesheet" href="/style.css?v=14" />
 </head>
 <body>
   <div class="app-layout">
@@ -25,6 +25,7 @@
         <button class="nav-btn active" data-view="chat"><span class="nav-icon">💬</span>Chat</button>
         <button class="nav-btn" data-view="hackathon"><span class="nav-icon">🏆</span>Hackathon Lab</button>
         <button class="nav-btn" data-view="study"><span class="nav-icon">📦</span>Study</button>
+        <button class="nav-btn" data-view="resume"><span class="nav-icon">📄</span>Resume Audit</button>
       </nav>
       <div class="sidebar-chats-section">
         <div class="sidebar-section-label flex-between"><span>Chats</span></div>
@@ -160,6 +161,34 @@
         </div>
       </section>
 
+      <!-- ─── RESUME AUDIT VIEW ─── -->
+      <section class="view" id="view-resume">
+        <div class="view-header">
+          <div>
+            <div class="view-title">📄 Resume ATS Audit</div>
+            <div class="view-sub">Resume upload karo ya text paste karo — deterministic ATS score, breakdown aur AI critique milta hai (evidence-based).</div>
+          </div>
+        </div>
+        <div class="resume-panel">
+          <div class="resume-input-row">
+            <label class="btn-small file-btn" for="resume-file">📎 Upload PDF / DOCX</label>
+            <input type="file" id="resume-file" accept=".pdf,.docx,.txt" hidden />
+            <span class="resume-file-name" id="resume-file-name"></span>
+          </div>
+          <textarea class="study-input" id="resume-paste" rows="7" placeholder="...ya resume ka text yahan paste karo (min 50 chars). Ek sath file aur text do toh file wala chalega."></textarea>
+          <input class="study-input" id="resume-jd" placeholder="(Optional) Target job description ya role — alignment isi ke hisaab se score hoga" />
+          <div class="resume-actions">
+            <button class="btn-small" id="resume-audit-btn">🩺 ATS Audit</button>
+          </div>
+        </div>
+        <div class="study-results" id="resume-results"></div>
+        <div class="resume-actionbar" id="resume-actionbar" style="display:none">
+          <button class="btn-outline cc-open-btn" id="resume-discuss-btn">💬 Discuss with Ek Sathi</button>
+          <button class="btn-outline" id="resume-report-pdf-btn">⤓ ATS Report PDF</button>
+          <button class="btn-outline" id="resume-clear-btn">↻ Sab clear</button>
+        </div>
+      </section>
+
     </main>
   </div>
 
@@ -167,6 +196,6 @@
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="/app.js?v=15"></script>
+  <script src="/app.js?v=17"></script>
 </body>
 </html>

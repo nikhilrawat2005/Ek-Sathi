@@ -869,6 +869,7 @@ const CC_TYPE = {
   website: { icon: '🌐', label: 'Website' },
   github: { icon: '👤', label: 'GitHub Profile' },
   repo: { icon: '📦', label: 'GitHub Repo' },
+  resume: { icon: '📄', label: 'Resume' },
 };
 const CC_SUGGEST = {
   hackathon: ['🎯 Isme main kya bana sakta hu?', '💰 Prize aur deadlines kya hain?', '🙋 Kya main participate karu?', '🧰 Konse skills chahiye?'],
@@ -876,6 +877,7 @@ const CC_SUGGEST = {
   website: ['🎯 Is site ka final goal kya hai?', '🧰 Kis tech se bani hai?', '🎨 Fonts aur color palette batao', '📄 Kin pages pe focus karna chahiye?'],
   github: ['👤 Is developer ka kaam kaisa hai?', '🧰 Kis tech pe focus karte hain?', '📈 Kya strengths/languages prominent hain?', '🚀 Kaunsa repo sabse valuable hai?'],
   repo: ['🎯 Ye repo kya karta hai?', '⚙️ Architecture/tech stack kya hai?', '🚀 Kya main isse chalana/build karna seekh sakta hu?', '📂 Kis code se bana hai?'],
+  resume: ['💪 Mera strongest point kya hai?', '🔍 Missing keywords kaunse hain?', '✍️ Har bullet ko kaise improve karu?', '🎯 Is JD ke liye kya highlight karu?'],
 };
 let _ccSubject = null;
 let _ccMessages = [];
@@ -930,6 +932,270 @@ async function ccRepoChanged(value) {
     if (r) { await _ccRender(repoSubject(r)); return; }
   }
   await _ccRender(_ccProfileSubject);
+}
+
+/* ── Resume ATS Audit ──────────────────────────────────── */
+let _lastAudit = null;
+let _lastResumeName = 'resume';
+let _lastResumeText = '';
+
+function resumeSubject(info) {
+  const a = info.audit || {};
+  const b = a.breakdown || {};
+  const h = a.heuristics || {};
+  const sm = h.skillMatch || {};
+  const ctx = [
+    'Type: Resume ATS Audit',
+    `Resume: ${info.name || 'resume'}${a.pageCount != null ? ` (${a.pageCount} page(s))` : ''}`,
+    `ATS score: ${a.atsScore != null ? a.atsScore + '/100' : 'n/a'} (${a.verdict || ''})${a.jdUsed ? ' — targeted job description audit' : ''}`,
+    `Breakdown — Impact & Metrics ${b.impactAndMetrics}/100, Action Verbs ${b.actionVerbs}/100, Formatting & Clarity ${b.formattingAndClarity}/100, Experience Depth ${b.experienceDepth}/100, Skills Relevance ${b.skillsRelevance}/100`,
+    `Criteria marks: ${(a.criteria || []).slice(0, 16).map((c) => `${c.label}=${c.score}/${c.max} (${c.status})`).join(' | ')}`,
+    `Keyword match: ${sm.matched && sm.matched.length ? sm.matched.length + '/' + sm.total + ' (' + sm.source + ')' : 'n/a'} ` + (sm.matched && sm.matched.length ? '— found: ' + sm.matched.slice(0, 12).join(', ') : ''),
+    `Sections detected: ${(h.sectionsDetected || []).join(', ') || 'none'}`,
+    `Links: ${(a.links || []).map((l) => `${l.status} ${l.url}`).join(' | ') || 'no links found'}`,
+    `Content quality: ${a.contentQuality || ''}`,
+    `Strengths: ${(a.strengths || []).join(' | ')}`,
+    `Critical negatives: ${(a.criticalNegatives || []).join(' | ')}`,
+    `Missing keywords: ${(a.missingRecommendedKeywords || []).join(', ') || 'none flagged'}`,
+    `Section review: ${(a.sectionReview || []).map((s) => `${s.section} (${s.verdict}) — ${(s.whatToImprove || []).join('; ')}`).join(' | ')}`,
+    `Action plan: ${(a.actionPlan || []).join(' | ')}`,
+    '',
+    'Resume text (excerpt):',
+    String(info.text || '').slice(0, 4000),
+  ].filter(Boolean).join('\n');
+  return { type: 'resume', title: `Resume Audit: ${info.name || 'resume'}`, subtitle: `ATS ${a.atsScore != null ? a.atsScore + '/100' : 'n/a'}`, contextText: ctx };
+}
+
+async function resumeAudit() {
+  const file = $('resume-file').files[0];
+  const text = $('resume-paste').value.trim();
+  const jd = $('resume-jd').value.trim();
+  if (!file && text.length < 50) { alert('Resume upload karo (PDF/DOCX/TXT) ya kam se kam 50 chars ka text paste karo.'); return; }
+  if (!lockOp('resume-audit', $('resume-audit-btn'))) return;
+  const res = $('resume-results');
+  res.innerHTML = '<div class="empty-msg">⏳ ATS audit chal raha hai… (score local heuristics se, critique AI se)</div>';
+  try {
+    let data;
+    if (file) {
+      const fd = new FormData();
+      fd.append('file', file);
+      if (jd) fd.append('targetJobDescription', jd);
+      data = await apiFetch('/api/resume/audit', { method: 'POST', body: fd });
+    } else {
+      data = await apiFetch('/api/resume/audit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, targetJobDescription: jd }) });
+    }
+    _lastAudit = data.audit;
+    _lastResumeName = data.fileName || 'resume';
+    _lastResumeText = file ? 'File: ' + (file.name || 'resume') : text;
+    renderResumeAudit(data);
+    $('resume-actionbar').style.display = '';
+  } catch (err) {
+    res.innerHTML = `<div class="empty-msg">⚠️ ${escHtml(err.message)}</div>`;
+  } finally {
+    unlockOp('resume-audit', $('resume-audit-btn'));
+  }
+}
+
+function scoreTone(v) { return v >= 80 ? '#16a34a' : v >= 60 ? '#d97706' : '#dc2626'; }
+
+const RE_GROUP_META = [
+  ['impact', '💪 Impact & Metrics', 'Numbers/proof ke saath results'],
+  ['action', '⚡ Action Verbs', 'Strong opening verbs'],
+  ['format', '🧾 Formatting & Clarity', 'Contact, sections, periods, pages'],
+  ['experience', '🎓 Experience Depth', 'Roles + dates depth'],
+  ['skills', '🎯 Skills & Keywords', 'JD/role keyword alignment'],
+];
+
+function renderResumeAudit(data) {
+  const a = data.audit;
+  const tone = scoreTone(a.atsScore);
+  const b = a.breakdown || {};
+  const h = a.heuristics || {};
+  const sm = h.skillMatch || {};
+  const bars = [
+    ['Impact & Metrics', b.impactAndMetrics, 'quantified bullets ka ratio'],
+    ['Action Verbs', b.actionVerbs, 'strong vs weak opening verbs'],
+    ['Formatting & Clarity', b.formattingAndClarity, 'contact, sections, trailing periods'],
+    ['Experience Depth', b.experienceDepth, 'roles + dates kitne hain'],
+    ['Skills Relevance', b.skillsRelevance, a.jdUsed ? 'target JD keyword match' : 'generic IT skills match'],
+  ];
+  const critGroups = RE_GROUP_META.map(([key, title, hint]) => ({
+    title, hint,
+    items: (a.criteria || []).filter((c) => String(c.key || '').split('.')[0] === key),
+  })).filter((g) => g.items.length);
+  const links = a.links || [];
+  const sections = a.sectionReview || [];
+  const meta = [
+    `${data.charCount ? data.charCount + ' chars' : ''}`,
+    a.pageCount != null ? `${a.pageCount} ${a.pageCount === 1 ? 'page' : 'pages'}${a.pageCount > 1 ? ' ⚠️' : ' ✅ single'}` : '',
+    `${h.totalBullets || 0} bullets`,
+    sm.total ? `${sm.matched.length}/${sm.total} keywords (${sm.source === 'jd' ? 'JD' : 'generic'})` : '',
+    links.length ? `${links.length} links` : '',
+    a.jdUsed ? '🎯 JD targeted' : 'no JD',
+  ].filter(Boolean).map((m) => `<span class="re-meta-chip">${escHtml(m)}</span>`).join('');
+  const res = $('resume-results');
+  res.innerHTML = `
+    <div class="re-card">
+      <div class="re-head">
+        <div class="re-score" style="--re-tone:${tone};--re-pct:${a.atsScore}">
+          <div class="re-score-num">${a.atsScore}/100</div>
+          <div class="re-verdict">${escHtml(a.verdict)}${a.jdUsed ? ' 🎯 targeted' : ''}</div>
+        </div>
+        <div class="re-meta">
+          <div class="re-file">📄 ${escHtml(data.fileName || 'resume')}</div>
+          <div class="re-meta-row">${meta}</div>
+          <div class="re-sub">${a.jdUsed ? '🎯 Target JD: ' + escHtml(a.jdUsed.slice(0, 90)) : 'Koi target JD nahi diya — generic IT benchmark use hua. JD paste karoge to exact keyword-alignment milega.'}</div>
+        </div>
+      </div>
+      <div class="re-bars">
+        ${bars.map(([label, val, hint]) => `
+          <div class="re-bar">
+            <div class="re-bar-top"><span>${label}</span><span class="re-bar-val" style="color:${scoreTone(val)}">${val}/100</span></div>
+            <div class="re-bar-track"><div class="re-bar-fill" style="width:${val}%;background:${scoreTone(val)}"></div></div>
+            <div class="re-bar-hint">${hint}</div>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <div class="re-card">
+      <div class="re-card-title">🔍 Har mark ka hisaab — criteria-by-criteria</div>
+      <div class="re-crit-groups">
+        ${critGroups.map((g) => `
+        <div class="re-crit-group">
+          <div class="re-crit-group-head"><span>${g.title}</span><span class="dim">${g.hint}</span></div>
+          ${g.items.map((c) => `
+            <div class="re-crit">
+              <div class="re-crit-top">
+                <span class="re-crit-dot ${c.status === 'pass' ? 'pass' : c.status === 'warn' ? 'warn' : 'fail'}"></span>
+                <span class="re-crit-label">${escHtml(c.label)}</span>
+                <span class="re-crit-score" style="color:${scoreTone((c.score / c.max) * 100)}">${c.score}/${c.max}</span>
+              </div>
+              <div class="re-crit-track"><div class="re-crit-fill ${c.status === 'pass' ? 'pass' : c.status === 'warn' ? 'warn' : 'fail'}" style="width:${Math.max(2, Math.round((c.score / c.max) * 100))}%"></div></div>
+              <div class="re-crit-why">${escHtml(c.why || '')}</div>
+              ${c.advice ? `<div class="re-crit-advice">💡 ${escHtml(c.advice)}</div>` : ''}
+            </div>`).join('')}
+        </div>`).join('')}
+      </div>
+    </div>
+
+    <div class="re-card">
+      <p class="re-summary">${mdToHtml(a.executiveSummary || '')}</p>
+      ${a.contentQuality ? `<p class="re-cq"><span class="re-cq-label">📝 Content ka substance (worth it hai kya):</span> ${escHtml(a.contentQuality)}</p>` : ''}
+      <div class="re-cols">
+        <div class="re-col">
+          <div class="re-col-title">✅ Strengths</div>
+          <ul>${(a.strengths || []).map((s) => `<li>${escHtml(s)}</li>`).join('') || '<li class="dim">—</li>'}</ul>
+        </div>
+        <div class="re-col">
+          <div class="re-col-title bad">⚠️ Critical Negatives</div>
+          <ul>${(a.criticalNegatives || []).map((s) => `<li>${escHtml(s)}</li>`).join('') || '<li class="dim">—</li>'}</ul>
+        </div>
+      </div>
+    </div>
+
+    ${sections.length ? `
+    <div class="re-card">
+      <div class="re-card-title">📚 Section-by-section review</div>
+      <div class="re-sec-grid">
+        ${sections.map((s) => `
+        <div class="re-sec re-sec-${s.verdict || 'ok'}">
+          <div class="re-sec-head"><span class="re-sec-name">${escHtml(s.section || 'Section')}</span><span class="re-sec-v">${s.verdict === 'strong' ? '✅ strong' : s.verdict === 'weak' ? '❌ weak' : '🔸 ok'}</span></div>
+          ${(s.whatWorks || []).length ? `<div class="re-sec-works">${s.whatWorks.map((w) => `<div>✓ ${escHtml(w)}</div>`).join('')}</div>` : ''}
+          ${(s.whatToImprove || []).length ? `<div class="re-sec-fix">${s.whatToImprove.map((w) => `<div>🛠 ${escHtml(w)}</div>`).join('')}</div>` : ''}
+        </div>`).join('')}
+      </div>
+    </div>` : ''}
+
+    ${links.length ? `
+    <div class="re-card">
+      <div class="re-card-title">🔗 Link status (real check)</div>
+      <div class="re-links">
+        ${links.map((l) => `
+        <div class="re-link">
+          <span class="re-link-status ${l.status === 'ok' ? 'ok' : 'bad'}">${l.status}</span>
+          <span class="re-link-url">${escHtml(l.url)}</span>
+        </div>`).join('')}
+      </div>
+    </div>` : ''}
+
+    <div class="re-card">
+      <div class="re-kw">
+        <div class="re-col-title">🔑 ATS Keywords Found (${(a.atsKeywordsFound || []).length})</div>
+        <div class="re-chips">${(a.atsKeywordsFound || []).slice(0, 25).map((k) => `<span class="chip chip-ok">${escHtml(k)}</span>`).join('') || '<span class="dim">text me koi common keyword nahi mila</span>'}</div>
+        <div class="re-col-title">🧩 Missing / Recommended</div>
+        <div class="re-chips">${(a.missingRecommendedKeywords || []).slice(0, 25).map((k) => `<span class="chip chip-warn">${escHtml(k)}</span>`).join('') || '<span class="dim">generic skills already hain</span>'}</div>
+      </div>
+    </div>
+
+    ${(a.bulletImprovements || []).length ? `
+    <div class="re-card">
+      <div class="re-col-title">✍️ Bullet Rewrites</div>
+      ${a.bulletImprovements.slice(0, 4).map((bi) => `
+        <div class="re-rw">
+          <div class="re-rw-orig">${escHtml(bi.original || '')}</div>
+          <div class="re-rw-arrow">↓ improved</div>
+          <div class="re-rw-new">${escHtml(bi.improved || '')}</div>
+        </div>`).join('')}
+    </div>` : ''}
+
+    <div class="re-card">
+      <div class="re-col-title">🎯 Action Plan</div>
+      <ol class="re-plan">${(a.actionPlan || []).slice(0, 4).map((s) => `<li>${escHtml(s)}</li>`).join('') || ''}</ol>
+    </div>`;
+  res.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function resumeAuditPdf() {
+  if (!_lastAudit) return;
+  if (!lockOp('resume-pdf', $('resume-report-pdf-btn'))) return;
+  const base = String(_lastResumeName || 'resume').replace(/\.[^.]+$/, '').replace(/[^\w\- ]/g, '').slice(0, 50) || 'resume';
+  try {
+    await downloadFile('/api/resume/audit-pdf', { audit: _lastAudit, fileName: _lastResumeName }, base + '_ATS_Report.pdf');
+  } catch (err) {
+    alert('PDF download fail: ' + err.message);
+  } finally {
+    unlockOp('resume-pdf', $('resume-report-pdf-btn'));
+  }
+}
+
+function resumeDiscuss() {
+  if (!_lastAudit) return;
+  openContextChat(resumeSubject({ audit: _lastAudit, name: _lastResumeName, text: _lastResumeText }), CC_SUGGEST.resume);
+}
+
+function clearResume() {
+  _lastAudit = null; _lastResumeName = 'resume'; _lastResumeText = '';
+  $('resume-file').value = '';
+  $('resume-file-name').textContent = '';
+  $('resume-paste').value = '';
+  $('resume-jd').value = '';
+  $('resume-results').innerHTML = '';
+  $('resume-actionbar').style.display = 'none';
+}
+
+async function downloadFile(url, payload, filename) {
+  const res = await fetch(API + url, { method: 'POST', headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  if (!res.ok) { let d = null; try { d = await res.json(); } catch (e) { /* non-JSON */ } throw new Error((d && d.error) || 'HTTP ' + res.status); }
+  const blob = await res.blob();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+function bindResume() {
+  $('resume-audit-btn').addEventListener('click', resumeAudit);
+  $('resume-report-pdf-btn').addEventListener('click', resumeAuditPdf);
+  $('resume-discuss-btn').addEventListener('click', resumeDiscuss);
+  $('resume-clear-btn').addEventListener('click', clearResume);
+  $('resume-file').addEventListener('change', () => {
+    const f = $('resume-file').files[0];
+    $('resume-file-name').textContent = f ? `📎 ${f.name} (${(f.size / 1024).toFixed(0)} KB)` : '';
+    if (f) $('resume-paste').value = '';
+  });
 }
 
 function buildContextChat() {
@@ -1201,6 +1467,7 @@ function init() {
 
   bindAttach();
   bindStudy();
+  bindResume();
   bindDiscovery();
   bindWelcomeChips();
   resetChatUI();
