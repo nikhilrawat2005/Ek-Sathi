@@ -97,6 +97,15 @@ function categorizedSkills(text) {
   return /(languages|frameworks|tools|technologies|databases|platforms|libraries|skills)[^:\n]{0,40}:{1}/i.test(String(text || ''));
 }
 
+// Match a keyword only when it appears as a whole term, so "java" never matches
+// "javascript" (it starts inside the word). Leading \b handled separately; the
+// trailing guard is a negative word-char lookahead so that terms ending in a
+// non-word char like "c++" or "c#" still match.
+function kwPattern(w) {
+  const esc = String(w).replace(/[.*+?^${}()|[\]\\]/g, '\\$&').trim().replace(/\s+/g, '[\\s\\-–—]+');
+  return new RegExp(`\\b${esc}(?![a-z0-9])`, 'i');
+}
+
 function splitLines(text) {
   return String(text || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
 }
@@ -121,9 +130,23 @@ function extractBullets(text) {
     const bare = line.replace(BULLET_TOKEN_RE, '');
     if (!bare || bare.length < 6) continue;
     if (/^https?:\/\//i.test(bare)) continue;
+    if (isNonBulletMetadata(bare)) continue;
     out.push(bare);
   }
   return out;
+}
+
+// Contact, date-range and label metadata lines are NOT bullets — when counted
+// they skew the metric/verb ratios and the total-bullet number. Keep the bullet
+// pool strictly to content lines that describe actual work.
+function isNonBulletMetadata(line) {
+  const t = String(line || '').trim();
+  if (!t || /^https?:\/\//i.test(t)) return true;
+  if (hasEmail(t) || hasPhone(t)) return true;
+  if (/^(?:phone|mobile|email|mail|address|location|linkedin|github|portfolio|website)\s*[:.]/i.test(t)) return true;
+  if (/^\s*(?:[a-z]{3,12}\.?\s?\d{1,2},?\s)?\d{4}\s*[-–—]\s*(?:present|current|\d{4}|[a-z]{3,12}\.?\s?\d{1,2},?\s\d{4})\s*$/i.test(t)) return true;
+  if (/^[\d\s.v+\-–—(),/:@#|•.]+$/i.test(t) && /\d/.test(t) && t.length <= 45) return true;
+  return false;
 }
 
 const hasEmail = (text) => /[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/i.test(text);
@@ -175,7 +198,7 @@ function buildCriteriaGroups({ text, bullets, sections, jd, heuristics, pageCoun
   const strongFrac = bullets.length ? strongLead / bullets.length : 0;
   const weakFrac = bullets.length ? weakLead / bullets.length : 0;
   const trailFrac = bullets.length ? bullets.filter((b) => /\.$/.test(b)).length / bullets.length : 0;
-  const spec = bullets.filter((b) => GENERIC_KEYWORDS.some((k) => new RegExp(`\\b${k}`, 'i').test(b))).length;
+  const spec = bullets.filter((b) => GENERIC_KEYWORDS.some((k) => kwPattern(k).test(b))).length;
   const specFrac = bullets.length ? spec / bullets.length : 0;
   const dateCount = matchDates(text);
   const years = totalYears(text);
@@ -192,11 +215,11 @@ function buildCriteriaGroups({ text, bullets, sections, jd, heuristics, pageCoun
   if (jdTokens.length >= 3) {
     dict = jdTokens;
     kwSource = 'target-jd';
-    matched = dict.filter((w) => new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i').test(text));
+    matched = dict.filter((w) => kwPattern(w).test(text));
   } else {
     kwSource = 'generic';
     dict = GENERIC_KEYWORDS;
-    matched = dict.filter((w) => new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i').test(text.toLowerCase()));
+    matched = dict.filter((w) => kwPattern(w).test(text));
   }
   const kwFrac = dict.length ? matched.length / dict.length : 0;
   const kwScore = clamp(100 * (1 - Math.exp(-kwFrac * 4.2)));
@@ -311,6 +334,13 @@ crit('action.strongLead', 'Bullets start with a strong action verb', Math.min(60
   return { impact, action, format, experience, skills };
 }
 
+// The deterministic scorer penalises a trailing "." on bullets (format.periods).
+// AI rewrites must follow the same rule, so a suggested rewrite never contradicts
+// the score. Keep dots that are not sentence terminators (e.g. "v1.2", "Inc.").
+function stripTrailPeriod(s) {
+  return String(s || '').replace(/(?<![0-9A-Z])\.(?=\s*$)/, '').replace(/\s+$/, '');
+}
+
 function dimScore(group) {
   const sum = group.reduce((a, c) => a + c.score, 0);
   const max = group.reduce((a, c) => a + c.max, 0) || 1;
@@ -396,6 +426,7 @@ async function critiqueResume({ resumeText, targetJobDescription, atsScore, brea
 }
 Constraints: bulletImprovements MUST reference existing bullets; max 6 sectionReview entries; keep JSON valid (escape quotes).`;
   const usr = [
+    `Today's date: ${new Date().toISOString().slice(0, 10)}. Judge the resume as of this date (treat "present" roles accordingly).`,
     `ATS score (deterministic, machine-computed): ${atsScore}/100 — verdict: ${verdict}.`,
     `Breakdown: impact=${breakdown.impactAndMetrics}, action=${breakdown.actionVerbs}, format=${breakdown.formattingAndClarity}, experience=${breakdown.experienceDepth}, skills=${breakdown.skillsRelevance}.`,
     `Heuristics: totalBullets=${heuristics.totalBullets}, quantified=${heuristics.quantifiedBullets}, strongVerbs=${heuristics.strongVerbs}, weakVerbs=${heuristics.weakVerbs}, fillerBullets=${heuristics.fillerBullets}, trailingPeriods=${heuristics.trailingPeriods}, email=${heuristics.hasEmail}, phone=${heuristics.hasPhone}, totalYears=${heuristics.totalYears ?? '?'}, missingSections=${(heuristics.missingSections || []).join(', ') || 'none'}, social=${JSON.stringify(heuristics.social || {})}, sections=${(heuristics.sectionsDetected || []).join(', ')}, keywordMatch=${JSON.stringify(heuristics.skillMatch || {})}.`,
@@ -433,9 +464,9 @@ Constraints: bulletImprovements MUST reference existing bullets; max 6 sectionRe
     contentQuality: String(parsed.contentQuality || ''),
     strengths: Array.isArray(parsed.strengths) ? parsed.strengths.slice(0, 6).map(String) : [],
     criticalNegatives: Array.isArray(parsed.criticalNegatives) ? parsed.criticalNegatives.slice(0, 6).map(String) : [],
-    atsKeywordsFound: Array.isArray(parsed.atsKeywordsFound) ? parsed.atsKeywordsFound.slice(0, 30).map(String) : [],
-    missingRecommendedKeywords: Array.isArray(parsed.missingRecommendedKeywords) ? parsed.missingRecommendedKeywords.slice(0, 15).map(String) : [],
-    bulletImprovements: Array.isArray(parsed.bulletImprovements) ? parsed.bulletImprovements.slice(0, 4).map((b) => ({ original: String(b.original || ''), improved: String(b.improved || '') })).filter((b) => b.original && b.improved) : [],
+    atsKeywordsFound: Array.isArray(parsed.atsKeywordsFound) ? parsed.atsKeywordsFound.slice(0, 30).map(String).filter((k) => kwPattern(k).test(resumeText)) : [],
+    missingRecommendedKeywords: Array.isArray(parsed.missingRecommendedKeywords) ? parsed.missingRecommendedKeywords.slice(0, 15).map(String).filter((k) => (targetJobDescription && !kwPattern(k).test(resumeText))).filter(Boolean) : [],
+    bulletImprovements: Array.isArray(parsed.bulletImprovements) ? parsed.bulletImprovements.slice(0, 4).map((b) => ({ original: String(b.original || ''), improved: stripTrailPeriod(String(b.improved || '')) })).filter((b) => b.original && b.improved) : [],
     actionPlan: Array.isArray(parsed.actionPlan) ? parsed.actionPlan.slice(0, 6).map(String) : [],
     sectionReview: Array.isArray(parsed.sectionReview) ? parsed.sectionReview.slice(0, 6).map((s) => ({
       section: String(s.section || ''),
