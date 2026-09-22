@@ -45,9 +45,9 @@ router.post('/', requireAuth, async (req, res) => {
 // GET /api/hackathons/discover — non-expired, non-dismissed discovery cards
 router.get('/discover', requireAuth, async (req, res) => {
   try {
-    const cards = await discovery.listDiscovery(req.userId);
+    const r = await discovery.listDiscovery(req.userId);
     const meta = await discovery.getDiscoveryMeta(req.userId);
-    res.json({ cards, meta });
+    res.json({ cards: r.cards, hackathons: r.hackathons, internships: r.internships, meta });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -6,7 +6,7 @@
   <title>Ek Sathi — Your AI Companion for Learning & Growth</title>
   <link rel="icon" href="/favicon.png" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/style.css?v=12" />
+  <link rel="stylesheet" href="/style.css?v=13" />
 </head>
 <body>
   <div class="app-layout">
@@ -131,9 +131,10 @@
         <!-- GitHub tab -->
         <div class="study-tab-content active" id="study-github">
           <div class="study-input-row">
-            <input type="text" id="github-input" placeholder="Enter GitHub repo URL or search query (e.g. facebook/react, vercel/next.js)" class="study-input" />
+            <input type="text" id="github-input" placeholder="Enter GitHub profile/repo URL or search query (e.g. facebook/react, vercel/next.js)" class="study-input" />
             <button id="github-analyze-btn" class="btn-small">Analyze</button>
           </div>
+          <div class="study-history" id="github-history"></div>
           <div class="study-results" id="github-results"></div>
           <div class="study-qa" id="github-qa" style="display:none">
             <div class="study-qa-header">
@@ -154,6 +155,7 @@
             <input type="text" id="website-input" placeholder="Enter website URL (e.g. https://example.com)" class="study-input" />
             <button id="website-analyze-btn" class="btn-small">Analyze</button>
           </div>
+          <div class="study-history" id="website-history"></div>
           <div class="study-results" id="website-results"></div>
           <div class="study-qa" id="website-qa" style="display:none">
             <div class="study-qa-header">
@@ -176,6 +178,6 @@
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="/app.js?v=11"></script>
+  <script src="/app.js?v=12"></script>
 </body>
 </html>

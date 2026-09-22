@@ -609,7 +609,7 @@ async function getUserProfileFull(usernameInput, opts = {}) {
   if (!username) return { error: 'empty_username', message: 'Username / GitHub profile link required.' };
 
   const cacheKey = username;
-  const cached = profileCache.get(cacheKey);
+  const cached = opts.fresh ? null : profileCache.get(cacheKey);
   if (cached && Date.now() - cached.ts < PROFILE_CACHE_TTL) return cached.data;
 
   const profile = await getUserProfile(username);

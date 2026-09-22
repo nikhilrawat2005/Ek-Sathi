@@ -431,13 +431,14 @@ function renderDiscoverGrid() {
   const list = filteredCards();
   if (!list.length) {
     const q = ($('discover-filter').value || '').trim() || ($('discover-source-filter').value) || ($('discover-type-filter').value);
-    grid.innerHTML = `<div class="d-card-empty">${
+    grid.innerHTML = `<div class="d-card-empty" style="grid-column:1/-1">${
       discoverCards.length
         ? 'No cards match the current filter.'
         : (q ? 'Scanning nahi hua abhi — "🔄 Scan Now" dabao.' : 'No live opportunities yet — hit "🔄 Scan Now" to scrape real data.')}</div>`;
     return;
   }
-  grid.innerHTML = list.map((c) => {
+
+  const cardHtml = (c) => {
     const isIntern = (c.type || 'hackathon') === 'internship';
     const badge = c.typeDisplay || (isIntern ? '💼 INTERNSHIP' : '🏆 HACKATHON');
     const metaBits = [
@@ -448,7 +449,7 @@ function renderDiscoverGrid() {
       !isIntern && c.seatsStatus ? `, ${c.seatsStatus}` : '',
     ].join(' | ').replace(/^\s*\|\s*/, '');
     return `
-      <div class="d-card" data-id="${escHtml(c.id)}">
+      <div class="d-card ${isIntern ? 'intern' : 'hack'}" data-id="${escHtml(c.id)}">
         <div class="d-card-head">
           <div>
             <div class="d-card-title">${escHtml(c.title || 'Untitled')}</div>
@@ -473,7 +474,18 @@ function renderDiscoverGrid() {
           </div>
         </div>
       </div>`;
-  }).join('');
+  };
+
+  const hacks = list.filter((c) => (c.type || 'hackathon') !== 'internship');
+  const interns = list.filter((c) => (c.type || 'hackathon') === 'internship');
+  const parts = [];
+  if (hacks.length) {
+    parts.push(`<div class="disc-section"><div class="disc-section-head hack"><span class="disc-ico">🏆</span> Hackathons <span class="disc-count">${hacks.length}</span><span class="disc-hint">top 20</span></div><div class="disc-cards">${hacks.map(cardHtml).join('')}</div></div>`);
+  }
+  if (interns.length) {
+    parts.push(`<div class="disc-section"><div class="disc-section-head intern"><span class="disc-ico">💼</span> Internships <span class="disc-count">${interns.length}</span><span class="disc-hint">top 10</span></div><div class="disc-cards">${interns.map(cardHtml).join('')}</div></div>`);
+  }
+  grid.innerHTML = parts.join('');
 
   grid.querySelectorAll('[data-save]').forEach((b) => b.addEventListener('click', async () => {
     const id = b.dataset.save;
@@ -502,7 +514,14 @@ function renderDiscoverGrid() {
 }
 
 /* ── Study: GitHub Profile (deep scan) ───────────────── */
-async function analyzeGithubProfile() {
+function githubLabel(raw) {
+  const m = String(raw || '').match(/github\.com\/([A-Za-z0-9_.-]+)/i);
+  if (m) return m[1];
+  const u = String(raw || '').trim();
+  return /^[A-Za-z0-9_.-]+$/.test(u) ? u : u;
+}
+
+async function analyzeGithubProfile(fresh) {
   const raw = $('github-input').value.trim();
   if (!raw) return;
   const res = $('github-results');
@@ -513,10 +532,13 @@ async function analyzeGithubProfile() {
   else if (/^[A-Za-z0-9_.-]+$/.test(raw) && raw.length <= 80) username = raw;
   else { res.innerHTML = '<div class="empty-msg">⚠️ Invalid input — use https://github.com/username or just a GitHub username.</div>'; return; }
 
+  addStudyHistory('github', username, githubLabel(raw));
+  renderStudyHistory();
+
   res.innerHTML = '<div class="empty-msg">⏳ GitHub profile scrape ho raha hai — sab public repos scan ho rahe hain (≈30s)…</div>';
   $('github-qa').style.display = 'none';
   try {
-    const data = await apiFetch(`/api/study/github/profile?username=${encodeURIComponent(username)}`);
+    const data = await apiFetch(`/api/study/github/profile?username=${encodeURIComponent(username)}${fresh ? '&fresh=1' : ''}`);
     if (data.error) { res.innerHTML = `<div class="empty-msg">⚠️ ${escHtml(data.message || data.error)}</div>`; return; }
     window._ghProfile = data;
     renderGithubProfile(data);
@@ -675,13 +697,20 @@ async function askGitHub() {
 }
 
 /* ── Study: Website (beast deep-scan) ───────────────────── */
-async function analyzeWebsite() {
+function domainLabel(raw) {
+  try { return String(new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`).hostname).replace(/^www\./, ''); }
+  catch (e) { return String(raw).trim(); }
+}
+
+async function analyzeWebsite(fresh) {
   const url = $('website-input').value.trim();
   if (!url) return;
   const res = $('website-results');
+  addStudyHistory('website', url, domainLabel(url));
+  renderStudyHistory();
   res.innerHTML = '<div class="empty-msg">⏳ Deep website scrape ho raha hai — home + internal pages + CSS scan (≈20-30s)…</div>';
   try {
-    const data = await apiFetch('/api/study/website', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) });
+    const data = await apiFetch('/api/study/website', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, ...(fresh ? { fresh: 1 } : {}) }) });
     if (data.status !== 'ok') {
       res.innerHTML = `<div class="empty-msg">⚠️ ${escHtml(data.message || 'Website scrape nahi ho paya')}</div>`;
       return;
@@ -735,6 +764,61 @@ async function analyzeWebsite() {
   } catch (err) {
     res.innerHTML = `<div class="empty-msg">⚠️ ${escHtml(err.message)}</div>`;
   }
+}
+
+/* ── Study: Persistent History (chips, re-scrape on click) ─ */
+const STUDY_HISTORY_KEY = 'es_study_history_v1';
+const STUDY_HISTORY_CAP = 12;
+let _studyHistory = [];
+
+function loadStudyHistory() {
+  try { _studyHistory = JSON.parse(localStorage.getItem(STUDY_HISTORY_KEY) || '[]'); }
+  catch (e) { _studyHistory = []; }
+  if (!Array.isArray(_studyHistory)) _studyHistory = [];
+  return _studyHistory;
+}
+function saveStudyHistory() {
+  try { localStorage.setItem(STUDY_HISTORY_KEY, JSON.stringify(_studyHistory)); } catch (e) {}
+}
+function addStudyHistory(kind, value, label) {
+  const norm = String(value).trim().replace(/\/+$/, '');
+  const exists = _studyHistory.findIndex((h) => h.kind === kind && h.value.toLowerCase() === norm.toLowerCase());
+  if (exists >= 0) {
+    _studyHistory[exists].label = label || _studyHistory[exists].label;
+    _studyHistory[exists].ts = Date.now();
+    const [moved] = _studyHistory.splice(exists, 1);
+    _studyHistory.unshift(moved);
+  } else {
+    _studyHistory.unshift({ kind, value: norm, label: label || kind, ts: Date.now() });
+  }
+  _studyHistory = _studyHistory.filter((h) => h.kind === 'github' || h.kind === 'website').slice(0, STUDY_HISTORY_CAP * 2);
+  saveStudyHistory();
+}
+function renderStudyHistory() {
+  loadStudyHistory();
+  const forKind = (kind) => _studyHistory
+    .filter((h) => h.kind === kind)
+    .map((h) => `<button class="study-history-chip" data-hkind="${kind}" data-hlabel="${escHtml(h.label)}" title="↻ Re-scrape fresh — changes detect karne ke liye">↻ ${escHtml(h.label)}</button>`)
+    .join('');
+  const ghEl = $('github-history'), weEl = $('website-history');
+  if (ghEl) ghEl.innerHTML = _studyHistory.some(h => h.kind === 'github') ? `<span class="study-history-label">History</span>${forKind('github')}` : '';
+  if (weEl) weEl.innerHTML = _studyHistory.some(h => h.kind === 'website') ? `<span class="study-history-label">History</span>${forKind('website')}` : '';
+  document.querySelectorAll('.study-history-chip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      const hlabel = chip.dataset.hlabel || '';
+      const hum = _studyHistory.find((h) => h.label.toLowerCase() === hlabel.toLowerCase());
+      if (!hum) return;
+      if (hum.kind === 'github') {
+        const input = $('github-input');
+        input.value = hum.value;
+        analyzeGithubProfile(true);
+      } else {
+        const input = $('website-input');
+        input.value = hum.value;
+        analyzeWebsite(true);
+      }
+    });
+  });
 }
 
 async function askWebsite() {
@@ -969,6 +1053,7 @@ function websiteSubject(d) {
 
 /* ── Study bind ────────────────────────────────────────── */
 function bindStudy() {
+  renderStudyHistory();
   $('github-analyze-btn').addEventListener('click', analyzeGithubProfile);
   $('github-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') analyzeGithubProfile(); });
   $('website-analyze-btn').addEventListener('click', analyzeWebsite);

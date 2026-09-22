@@ -81,7 +81,7 @@ router.get('/github/profile', requireAuth, async (req, res) => {
   try {
     const username = String(req.query.username || '').trim();
     if (!username) return res.status(400).json({ error: 'Username or profile link required (?username=...)' });
-    const result = await repo.getUserProfileFull(username, { capRepos: req.query.cap });
+    const result = await repo.getUserProfileFull(username, { capRepos: req.query.cap, fresh: req.query.fresh === '1' || req.query.fresh === 'true' });
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -110,7 +110,8 @@ router.post('/website', requireAuth, async (req, res) => {
   try {
     const url = String((req.body && req.body.url) || '').trim();
     if (!url) return res.status(400).json({ error: 'URL is required.' });
-    const result = await website.analyzeWebsite(url);
+    const fresh = Boolean(req.body && (req.body.fresh === 1 || req.body.fresh === true || req.body.fresh === '1' || req.body.fresh === 'true'));
+    const result = await website.analyzeWebsite(url, { fresh });
     if (result.status === 'error') {
       return res.status(200).json({ status: 'error', message: result.message || 'Site scrape nahi ho paya.', hint: result.hint });
     }

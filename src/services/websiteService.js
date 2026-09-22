@@ -305,7 +305,7 @@ function detectStack(htmls, headers, cssText) {
 async function deepScrapeSite(urlInput, opts = {}) {
   const url = normalizeUrl(urlInput);
   const key = cacheKey(url);
-  if (cache.has(key) && Date.now() - cache.get(key).ts < CACHE_TTL) return cache.get(key).site;
+  if (!opts.fresh && cache.has(key) && Date.now() - cache.get(key).ts < CACHE_TTL) return cache.get(key).site;
 
   let mainRes;
   try {
@@ -426,7 +426,7 @@ async function deepScrapeSite(urlInput, opts = {}) {
 
 // ── Beast analysis (LLM narrative) ─────────────────────────
 async function analyzeWebsite(urlInput, opts = {}) {
-  const site = await deepScrapeSite(urlInput);
+  const site = await deepScrapeSite(urlInput, opts);
   if (site.status !== 'ok') return site;
 
   const stackStr = [

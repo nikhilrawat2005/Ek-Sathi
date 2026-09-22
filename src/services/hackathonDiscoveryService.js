@@ -845,9 +845,14 @@ async function listDiscovery(userId) {
     .get();
 
   const items = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  // Sort by newest first, limit to MAX_CARDS
+  // Sort by newest first
   items.sort((a, b) => (b.discoveredAt || 0) - (a.discoveredAt || 0));
-  return items.slice(0, MAX_CARDS);
+
+  // Partition into colorful top section (hackathons, MAX_HACKATHONS)
+  // and bottom section (internships, MAX_INTERNSHIPS)
+  const hackathons = items.filter((i) => i.type !== 'internship').slice(0, MAX_HACKATHONS);
+  const internships = items.filter((i) => i.type === 'internship').slice(0, MAX_INTERNSHIPS);
+  return { hackathons, internships, cards: [...hackathons, ...internships] };
 }
 
 // ── Save Discovery → Hackathons ───────────────────────────
