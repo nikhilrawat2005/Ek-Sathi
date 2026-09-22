@@ -877,6 +877,7 @@ async function saveDiscovery(userId, discoveryId, participating = false) {
   await docRef.set({
     status: 'saved',
     savedHackathonId: hack.id,
+    savedAt: Date.now(),
   }, { merge: true });
 
   return hack;
@@ -947,12 +948,119 @@ async function toggleDiscovery(userId, enable) {
   return { enabled: Boolean(enable) };
 }
 
+// ── Saved list (Discover → Saved section) ──────────────────
+async function listSavedDiscovery(userId) {
+  const snap = await discoveryColl(userId)
+    .where('status', '==', 'saved')
+    .get();
+
+  const items = snap.docs.map((d) => {
+    const data = d.data();
+    const msgs = (data.discussion && data.discussion.messages) || [];
+    return {
+      id: d.id,
+      ...data,
+      discussionCount: Array.isArray(msgs) ? msgs.length : 0,
+    };
+  });
+  items.sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
+  return items;
+}
+
+// ── Discussion memory (per saved card) ─────────────────────
+const DISCUSSION_CAP = 40;
+
+const CC_TYPE_LABEL = { hackathon: 'Hackathon', internship: 'Internship', website: 'Website', repo: 'GitHub Repo' };
+
+function buildSubjectFromItem(item) {
+  const isIntern = (item.type || 'hackathon') === 'internship';
+  const lines = [];
+  const push = (label, val) => { if (val) lines.push(`${label}: ${String(val).trim()}`); };
+  push('Type', isIntern ? 'Internship' : 'Hackathon');
+  push('Platform', item.platform);
+  push('Title', item.title);
+  if (isIntern) push('Company', item.company);
+  push('Summary', item.summary);
+  push('What to build', item.whatToBuild);
+  if (isIntern) push('Stipend', item.stipend);
+  if (isIntern) push('Duration', item.duration);
+  if (!isIntern) push('Prize', item.prize);
+  push('Mode', item.mode);
+  push('Location', item.location);
+  if (!isIntern) push('Fee', item.fee);
+  if (!isIntern) push('Seats', item.seatsStatus);
+  push('Team size', item.teamSize);
+  push('Eligibility', item.eligibility);
+  push('Registration deadline', item.registrationDeadline);
+  if (item.startDate) push('Dates', `${item.startDate}${item.endDate ? ' → ' + item.endDate : ''}`);
+  if (Array.isArray(item.tags) && item.tags.length) push('Tags', item.tags.join(', '));
+  push('Link', item.link);
+  return {
+    type: isIntern ? 'internship' : 'hackathon',
+    title: item.title || 'Untitled',
+    subtitle: item.platform || '',
+    contextText: lines.join('\n'),
+  };
+}
+
+function capMessages(messages) {
+  if (!Array.isArray(messages)) return [];
+  return messages.slice(-DISCUSSION_CAP).map((m) => ({
+    role: m.role === 'assistant' ? 'assistant' : 'user',
+    content: String(m.content || '').slice(0, 3000),
+  })).filter((m) => m.content.trim());
+}
+
+async function getDiscussion(userId, discoveryId) {
+  const snap = await discoveryColl(userId).doc(discoveryId).get();
+  if (!snap.exists) return { status: 'error', message: 'Discovery card not found' };
+  const item = { id: snap.id, ...snap.data() };
+  const stored = (item.discussion && item.discussion.messages) || [];
+  return {
+    status: 'ok',
+    subject: (item.discussion && item.discussion.subject) || buildSubjectFromItem(item),
+    messages: capMessages(stored),
+  };
+}
+
+async function updateDiscussion(userId, discoveryId, { seed, content } = {}) {
+  const snap = await discoveryColl(userId).doc(discoveryId).get();
+  if (!snap.exists) throw new Error('Discovery card not found');
+  const item = { id: snap.id, ...snap.data() };
+
+  const subject = (item.discussion && item.discussion.subject) || buildSubjectFromItem(item);
+  const existing = capMessages((item.discussion && item.discussion.messages) || []);
+
+  // Seed mode: persist an already-happened conversation (e.g. chat started on the Discover card, then saved)
+  if (seed && Array.isArray(seed) && seed.length && existing.length === 0) {
+    const messages = capMessages(seed);
+    await snap.ref.set({ discussion: { subject, messages }, updatedAt: Date.now() }, { merge: true });
+    return { status: 'ok', saved: messages.length };
+  }
+
+  if (!content || !String(content).trim()) return { status: 'error', message: 'message required' };
+
+  const messages = [...existing, { role: 'user', content: String(content).slice(0, 3000) }];
+  const contextChat = require('./contextChatService');
+  const r = await contextChat.discuss(subject, messages);
+  if (r.status !== 'ok') throw new Error(r.message || 'Discussion failed');
+  messages.push({ role: 'assistant', content: r.answer });
+
+  const capped = capMessages(messages);
+  await snap.ref.set({ discussion: { subject, messages: capped }, updatedAt: Date.now() }, { merge: true });
+
+  return { status: 'ok', answer: r.answer, count: capped.length };
+}
+
 module.exports = {
   runDiscovery,
   listDiscovery,
+  listSavedDiscovery,
   saveDiscovery,
   dismissDiscovery,
   autoExpireDiscovery,
   getDiscoveryMeta,
   toggleDiscovery,
+  getDiscussion,
+  updateDiscussion,
 };

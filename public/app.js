@@ -303,6 +303,64 @@ function setScanStatus(text, busy) {
   el.classList.toggle('busy', !!busy);
 }
 
+let savedCards = [];
+let _savedActive = false;
+
+async function loadSavedCards() {
+  try {
+    const data = await apiFetch('/api/hackathons/discover/saved');
+    savedCards = data.cards || [];
+    renderSavedGrid();
+  } catch (err) {
+    $('saved-grid').innerHTML = `<div class="d-card-empty">⚠️ ${escHtml(err.message)}</div>`;
+  }
+}
+
+function renderSavedGrid() {
+  const grid = $('saved-grid');
+  if (!savedCards.length) {
+    grid.innerHTML = `<div class="d-card-empty">Abhi kuch saved nahi hai — Discover me kisi card pe "💾 Save" dabao, phir yahan uska discussion memory ke saath milega.</div>`;
+    return;
+  }
+  grid.innerHTML = savedCards.map((c) => {
+    const isIntern = (c.type || 'hackathon') === 'internship';
+    const badge = isIntern ? '💼 INTERNSHIP' : '🏆 HACKATHON';
+    const metaBits = [
+      c.mode ? c.mode : '',
+      c.location ? c.location : '',
+      isIntern ? (c.stipend ? `, stipend ${c.stipend}` : '') : (c.fee ? `, ${c.fee}` : ''),
+      isIntern && c.duration ? `, ${c.duration}` : '',
+    ].join(' | ').replace(/^\s*\|\s*/, '');
+    return `
+      <div class="d-card" data-id="${escHtml(c.id)}">
+        <div class="d-card-head">
+          <div>
+            <div class="d-card-title">${escHtml(c.title || 'Untitled')}</div>
+            <div class="d-card-source ${escHtml(c.platform || '')}">${escHtml(badge)} · ${escHtml(c.platform || '')}</div>
+          </div>
+        </div>
+        <div class="d-card-body">
+          ${c.summary ? `<p>${escHtml(c.summary)}</p>` : ''}
+          ${c.prize ? `<p style="margin-top:6px"><span class="d-prize">💰 ${escHtml(c.prize)}</span></p>` : ''}
+          ${isIntern && c.company ? `<p style="margin-top:4px">🏢 ${escHtml(c.company)}</p>` : ''}
+          ${metaBits ? `<p style="margin-top:6px">📍 ${escHtml(metaBits)}</p>` : ''}
+        </div>
+        ${(c.tags && c.tags.length) ? `<div class="d-card-meta">${c.tags.slice(0, 6).map((t) => `<span class="d-card-tag">${escHtml(t)}</span>`).join('')}</div>` : ''}
+        <div class="d-card-foot">
+          ${c.link ? `<a class="d-link" href="${escHtml(c.link)}" target="_blank" rel="noopener">🔗 View details ↗</a>` : ''}
+          <div class="d-card-actions">
+            <button class="btn-ghost" data-discuss="${escHtml(c.id)}">💬 Discuss${c.discussionCount ? ` · ${c.discussionCount}m` : ''}</button>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
+  grid.querySelectorAll('[data-discuss]').forEach((b) => b.addEventListener('click', () => {
+    const card = savedCards.find((x) => x.id === b.dataset.discuss);
+    if (card) openContextChat(subjectFromCard(card), CC_SUGGEST[card.type || 'hackathon'] || CC_SUGGEST.hackathon);
+  }));
+}
+
 async function loadDiscoverCards() {
   try {
     const data = await apiFetch('/api/hackathons/discover');
@@ -421,7 +479,13 @@ function renderDiscoverGrid() {
     const id = b.dataset.save;
     try {
       await apiFetch(`/api/hackathons/discover/${id}/save`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ participating: false }) });
+      if (_ccSubject && _ccSubject.id === id && _ccMessages.length) {
+        try {
+          await apiFetch(`/api/hackathons/discover/${id}/discussion`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ seed: _ccMessages }) });
+        } catch (e) { /* seed persist optional */ }
+      }
       await loadDiscoverCards();
+      await loadSavedCards();
     } catch (err) { alert('Save failed: ' + err.message); }
   }));
   grid.querySelectorAll('[data-dismiss]').forEach((b) => b.addEventListener('click', async () => {
@@ -720,6 +784,7 @@ const CC_SUGGEST = {
 };
 let _ccSubject = null;
 let _ccMessages = [];
+let _ccPersistId = null;
 
 function buildContextChat() {
   let overlay = $('context-chat');
@@ -752,8 +817,9 @@ function buildContextChat() {
   return overlay;
 }
 
-function openContextChat(subject, suggested) {
+async function openContextChat(subject, suggested) {
   const meta = CC_TYPE[subject && subject.type] || CC_TYPE.website;
+  _ccPersistId = (subject && subject.id) ? String(subject.id) : null;
   _ccSubject = subject;
   _ccMessages = [];
   const o = buildContextChat();
@@ -763,11 +829,26 @@ function openContextChat(subject, suggested) {
   $('cc-sub').textContent = (subject && subject.subtitle) || meta.label;
   const msgs = $('cc-msgs');
   msgs.innerHTML = '';
-  const title = subject && subject.title ? subject.title : 'ye topic';
-  hackMsgInto(msgs, 'assistant', `👋 Main **${title}** ki scraped details ke saath discuss kar sakta hu. Jo bhi poochna ho, poocho!`);
   const chips = $('cc-chips');
   chips.innerHTML = (suggested && suggested.length ? suggested : CC_SUGGEST[subject && subject.type] || CC_SUGGEST.website)
     .map((s) => `<button class="cc-chip" data-q="${escHtml(s)}" onclick="ccSend(this.dataset.q)">${escHtml(s)}</button>`).join('');
+  const title = subject && subject.title ? subject.title : 'ye topic';
+
+  // Saved card → load its persisted discussion memory and continue from there
+  if (_ccPersistId) {
+    try {
+      const data = await apiFetch(`/api/hackathons/discover/${_ccPersistId}/discussion`);
+      if (data.status === 'ok' && data.messages && data.messages.length) {
+        _ccMessages = data.messages.slice();
+        data.messages.forEach((m) => hackMsgInto(msgs, m.role === 'user' ? 'user' : 'assistant', m.content));
+        hackMsgInto(msgs, 'assistant', `📌 Yeh baat saved memory se continue ho rahi hai — ${data.messages.length} messages yaad hain. Poochte raho!`);
+        setTimeout(() => { $('cc-input').focus(); }, 80);
+        return;
+      }
+    } catch (e) { /* memory load failed → fresh start */ }
+  }
+
+  hackMsgInto(msgs, 'assistant', `👋 Main **${title}** ki scraped details ke saath discuss kar sakta hu. Jo bhi poochna ho, poocho!`);
   setTimeout(() => { $('cc-input').focus(); }, 80);
 }
 
@@ -792,20 +873,43 @@ async function ccSend(text) {
   inp.value = '';
   inp.style.height = 'auto';
   const msgs = $('cc-msgs');
-  $( 'cc-chips').innerHTML = '';
+  $('cc-chips').innerHTML = '';
   _ccMessages.push({ role: 'user', content: q });
   hackMsgInto(msgs, 'user', q);
   const typing = ccTypingInto(msgs);
   const send = $('cc-send');
   send.disabled = true;
   try {
-    const data = await apiFetch('/api/study/discuss', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subject: _ccSubject, messages: _ccMessages }) });
-    typing.remove();
-    if (data.status === 'ok') {
-      _ccMessages.push({ role: 'assistant', content: data.answer });
-      hackMsgInto(msgs, 'assistant', data.answer || '…');
+    let data;
+    if (_ccPersistId) {
+      // Saved item → server keeps the memory, conversation continues from it
+      data = await apiFetch(`/api/hackathons/discover/${_ccPersistId}/discussion`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: q }),
+      });
+      typing.remove();
+      if (data.status === 'ok') {
+        if (data.answer) {
+          _ccMessages.push({ role: 'assistant', content: data.answer });
+          hackMsgInto(msgs, 'assistant', data.answer);
+        }
+      } else {
+        hackMsgInto(msgs, 'assistant', '⚠️ ' + (data.message || data.error || 'Jawab nahi mila'));
+      }
     } else {
-      hackMsgInto(msgs, 'assistant', '⚠️ ' + (data.message || data.error || 'Jawab nahi mila'));
+      data = await apiFetch('/api/study/discuss', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subject: _ccSubject, messages: _ccMessages }),
+      });
+      typing.remove();
+      if (data.status === 'ok') {
+        _ccMessages.push({ role: 'assistant', content: data.answer });
+        hackMsgInto(msgs, 'assistant', data.answer || '…');
+      } else {
+        hackMsgInto(msgs, 'assistant', '⚠️ ' + (data.message || data.error || 'Jawab nahi mila'));
+      }
     }
   } catch (err) {
     typing.remove();
@@ -838,7 +942,7 @@ function subjectFromCard(c) {
     c.tags && c.tags.length ? `Tags: ${c.tags.join(', ')}` : '',
     c.link ? `Link: ${c.link}` : '',
   ].filter(Boolean).join('\n');
-  return { type: isIntern ? 'internship' : 'hackathon', title: c.title || 'Untitled', subtitle: c.platform || '', contextText: parts };
+  return { id: c.id, type: isIntern ? 'internship' : 'hackathon', title: c.title || 'Untitled', subtitle: c.platform || '', contextText: parts };
 }
 
 function websiteSubject(d) {
@@ -886,6 +990,20 @@ function bindDiscovery() {
   $('discover-filter').addEventListener('input', renderDiscoverGrid);
   $('discover-source-filter').addEventListener('change', renderDiscoverGrid);
   $('discover-type-filter').addEventListener('change', renderDiscoverGrid);
+  const tabDiscover = $('tab-discover');
+  const tabSaved = $('tab-saved');
+  if (tabDiscover && tabSaved) {
+    const setTab = (which) => {
+      _savedActive = which === 'saved';
+      tabDiscover.classList.toggle('active', !_savedActive);
+      tabSaved.classList.toggle('active', _savedActive);
+      $('panel-discover').style.display = _savedActive ? 'none' : 'flex';
+      $('panel-saved').style.display = _savedActive ? 'flex' : 'none';
+      if (_savedActive) loadSavedCards(); else renderDiscoverGrid();
+    };
+    tabDiscover.addEventListener('click', () => setTab('discover'));
+    tabSaved.addEventListener('click', () => setTab('saved'));
+  }
 }
 
 /* ── Init ──────────────────────────────────────────────── */

@@ -690,6 +690,16 @@ button { font-family: inherit; }
 }
 .cc-send:disabled { opacity: 0.5; cursor: default; }
 
+/* ═══ HACKATHON TABS (Discover / Saved) ═══ */
+.hack-tabs { display: flex; gap: 6px; padding: 2px 20px 8px; flex-shrink: 0; }
+.hack-tab {
+  font-size: 12.5px; font-weight: 700; cursor: pointer; color: var(--text2);
+  background: var(--surface); border: 1px solid var(--border2); border-radius: 999px;
+  padding: 6px 14px; transition: all var(--transition);
+}
+.hack-tab:hover { color: var(--accent); border-color: var(--accent); }
+.hack-tab.active { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 2px 10px rgba(var(--accent-rgb), 0.3); }
+
 /* ═══ RESPONSIVE ═══ */
 
 @media (max-width: 860px) {

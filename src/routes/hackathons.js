@@ -91,6 +91,40 @@ router.post('/discover/toggle', requireAuth, async (req, res) => {
   }
 });
 
+// GET /api/hackathons/discover/saved — saved cards (Saved section)
+router.get('/discover/saved', requireAuth, async (req, res) => {
+  try {
+    const cards = await discovery.listSavedDiscovery(req.userId);
+    res.json({ cards });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/hackathons/discover/:id/discussion — persisted chat memory for a saved card
+router.get('/discover/:id/discussion', requireAuth, async (req, res) => {
+  try {
+    res.json(await discovery.getDiscussion(req.userId, req.params.id));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/hackathons/discover/:id/discussion — continue/persist discussion
+//   body { content } → server appends user msg, LLM answers, persists memory
+//   body { seed }    → persist an already-happened conversation (chat from the Discover card)
+router.post('/discover/:id/discussion', requireAuth, async (req, res) => {
+  try {
+    const result = await discovery.updateDiscussion(req.userId, req.params.id, {
+      seed: req.body && req.body.seed,
+      content: req.body && req.body.content,
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // GET /api/hackathons/:id
 router.get('/:id', requireAuth, async (req, res) => {
   try {
