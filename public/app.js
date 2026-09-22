@@ -60,7 +60,7 @@ function renderSessions() {
   list.innerHTML = sessions.map((s) => `
     <div class="session-item ${s.id === currentSessionId ? 'active' : ''}" data-id="${escHtml(s.id)}">
       <div class="session-title">${escHtml(s.title || 'Untitled')}</div>
-      <button class="btn-delete-session" title="Delete chat" data-del="${escHtml(s.id)}">🗑</button>
+      <button class="btn-delete-session" title="Delete chat" data-del="${escHtml(s.id)}"><svg class="ic" style="width:13px;height:13px"><use href="#i-trash" /></svg></button>
     </div>`).join('');
   list.querySelectorAll('.session-item').forEach((el) => {
     el.addEventListener('click', (e) => {
@@ -109,7 +109,7 @@ function resetChatUI() {
   $('chat-session-title').textContent = 'New Chat';
   const welcome = `
     <div id="welcome-screen" class="welcome-screen">
-      <div class="welcome-orb">🦉</div>
+      <div class="welcome-orb"><svg class="ic"><use href="#i-spark" /></svg></div>
       <h1 class="welcome-title">Hi, I'm Ek Sathi</h1>
       <p class="welcome-sub">Your AI Companion for Learning & Growth</p>
       <div class="welcome-suggestions">
@@ -201,7 +201,7 @@ function addTyping(container = $('messages-container')) {
   row.innerHTML = `
     <div class="message-bubble-wrapper">
       <div class="message-bubble">
-        <div class="typing-indicator"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="typing-label">Ek Sathi soch raha hai…</span></div>
+        <div class="typing-indicator"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="typing-label">Ek Sathi is thinking…</span></div>
       </div>
     </div>`;
   container.appendChild(row);
@@ -234,7 +234,7 @@ function renderFileChips() {
   if (!attachedFiles.length) { row.innerHTML = ''; return; }
   row.innerHTML = attachedFiles.map((f, i) => `
     <span class="file-chip" title="${escHtml(f.name)}">
-      📎 ${escHtml(f.name)}
+      ${escHtml(f.name)}
       <button data-i="${i}" class="file-chip-x">✕</button>
     </span>`).join('');
   row.querySelectorAll('.file-chip-x').forEach((b) => b.addEventListener('click', () => {
@@ -292,7 +292,7 @@ async function sendMessage() {
     appendMessage('assistant', data.reply || '…');
   } catch (err) {
     typing.remove();
-    appendMessage('assistant', '⚠️ ' + (err.message || 'Something went wrong.'));
+    appendMessage('assistant', err.message || 'Something went wrong.');
   } finally {
     unlockOp('chat', $('send-btn'));
     $('message-input').focus();
@@ -326,19 +326,19 @@ async function loadSavedCards() {
     savedCards = data.cards || [];
     renderSavedGrid();
   } catch (err) {
-    $('saved-grid').innerHTML = `<div class="d-card-empty">⚠️ ${escHtml(err.message)}</div>`;
+    $('saved-grid').innerHTML = `<div class="d-card-empty">${escHtml(err.message)}</div>`;
   }
 }
 
 function renderSavedGrid() {
   const grid = $('saved-grid');
   if (!savedCards.length) {
-    grid.innerHTML = `<div class="d-card-empty">Abhi kuch saved nahi hai — Discover me kisi card pe "💾 Save" dabao, phir yahan uska discussion memory ke saath milega.</div>`;
+    grid.innerHTML = `<div class="d-card-empty">Nothing saved yet — open Discover and press Save on any card to keep its discussion memory here.</div>`;
     return;
   }
   grid.innerHTML = savedCards.map((c) => {
     const isIntern = (c.type || 'hackathon') === 'internship';
-    const badge = isIntern ? '💼 INTERNSHIP' : '🏆 HACKATHON';
+    const badge = isIntern ? 'INTERNSHIP' : 'HACKATHON';
     const metaBits = [
       c.mode ? c.mode : '',
       c.location ? c.location : '',
@@ -355,15 +355,15 @@ function renderSavedGrid() {
         </div>
         <div class="d-card-body">
           ${c.summary ? `<p>${escHtml(c.summary)}</p>` : ''}
-          ${c.prize ? `<p style="margin-top:6px"><span class="d-prize">💰 ${escHtml(c.prize)}</span></p>` : ''}
-          ${isIntern && c.company ? `<p style="margin-top:4px">🏢 ${escHtml(c.company)}</p>` : ''}
-          ${metaBits ? `<p style="margin-top:6px">📍 ${escHtml(metaBits)}</p>` : ''}
+          ${c.prize ? `<p><span class="d-prize">${escHtml(c.prize)}</span></p>` : ''}
+          ${isIntern && c.company ? `<p>${escHtml(c.company)}</p>` : ''}
+          ${metaBits ? `<p>${escHtml(metaBits)}</p>` : ''}
         </div>
         ${(c.tags && c.tags.length) ? `<div class="d-card-meta">${c.tags.slice(0, 6).map((t) => `<span class="d-card-tag">${escHtml(t)}</span>`).join('')}</div>` : ''}
         <div class="d-card-foot">
-          ${c.link ? `<a class="d-link" href="${escHtml(c.link)}" target="_blank" rel="noopener">🔗 View details ↗</a>` : ''}
+          ${c.link ? `<a class="d-link" href="${escHtml(c.link)}" target="_blank" rel="noopener">View details ↗</a>` : ''}
           <div class="d-card-actions">
-            <button class="btn-ghost" data-discuss="${escHtml(c.id)}">💬 Discuss${c.discussionCount ? ` · ${c.discussionCount}m` : ''}</button>
+            <button class="btn-ghost" data-discuss="${escHtml(c.id)}">Discuss${c.discussionCount ? ` · ${c.discussionCount}m` : ''}</button>
           </div>
         </div>
       </div>`;
@@ -381,14 +381,14 @@ async function loadDiscoverCards() {
     discoverCards = data.cards || [];
     const meta = data.meta || {};
     if (meta.nextRunAt) {
-      setScanStatus(`📥 ${discoverCards.length} live candidates · next auto-scan ${new Date(meta.nextRunAt).toLocaleString()}`, false);
+      setScanStatus(`${discoverCards.length} live candidates · next auto-scan ${new Date(meta.nextRunAt).toLocaleString()}`, false);
     } else {
-      setScanStatus(`📥 ${discoverCards.length} live candidates`, false);
+      setScanStatus(`${discoverCards.length} live candidates`, false);
     }
     renderDiscoverGrid();
   } catch (err) {
     console.error(err);
-    setScanStatus('⚠️ ' + err.message, false);
+    setScanStatus(err.message, false);
     $('discover-grid').innerHTML = `<div class="d-card-empty">Could not load discoveries.</div>`;
   }
 }
@@ -396,19 +396,19 @@ async function loadDiscoverCards() {
 async function scanNow() {
   const btn = $('hack-scan-btn');
   if (!lockOp('scan', btn)) return;
-  setScanStatus('⏳ Scraping Devpost · Unstop · Devfolio · HackerEarth · MLH · Internshala…', true);
+  setScanStatus('Scraping Devpost · Unstop · Devfolio · HackerEarth · MLH · Internshala…', true);
   try {
     const data = await apiFetch('/api/hackathons/discover/run', { method: 'POST' });
     if (data.paused) {
-      setScanStatus('⏸ Discovery is paused.', false);
+      setScanStatus('Discovery is paused.', false);
     } else if (data.skipped) {
-      setScanStatus(`⏳ Already scanned · next at ${new Date(data.nextRunAt).toLocaleString()}`, false);
+      setScanStatus(`Already scanned · next at ${new Date(data.nextRunAt).toLocaleString()}`, false);
     } else {
-      setScanStatus(`✅ +${data.added} new live opportunities · next at ${new Date(data.nextRunAt).toLocaleString()}`, false);
+      setScanStatus(`+${data.added} new live opportunities · next at ${new Date(data.nextRunAt).toLocaleString()}`, false);
     }
     await loadDiscoverCards();
   } catch (err) {
-    setScanStatus('⚠️ ' + err.message, false);
+    setScanStatus(err.message, false);
   } finally {
     unlockOp('scan', btn);
   }
@@ -435,8 +435,8 @@ function fmtDate(val) {
 }
 
 function cardDateLabel(c) {
-  if (c.registrationDeadline) return `⏰ Reg closes ${fmtDate(c.registrationDeadline)}`;
-  if (c.startDate) return `🚀 ${fmtDate(c.startDate)}${c.endDate ? ' → ' + fmtDate(c.endDate) : ''}`;
+  if (c.registrationDeadline) return `Reg closes ${fmtDate(c.registrationDeadline)}`;
+  if (c.startDate) return `${fmtDate(c.startDate)}${c.endDate ? ' → ' + fmtDate(c.endDate) : ''}`;
   return '';
 }
 
@@ -448,13 +448,13 @@ function renderDiscoverGrid() {
     grid.innerHTML = `<div class="d-card-empty" style="grid-column:1/-1">${
       discoverCards.length
         ? 'No cards match the current filter.'
-        : (q ? 'Scanning nahi hua abhi — "🔄 Scan Now" dabao.' : 'No live opportunities yet — hit "🔄 Scan Now" to scrape real data.')}</div>`;
+        : (q ? 'Scanning has not run yet — press "Scan Now" to pull live data.' : 'No live opportunities yet — press "Scan Now" to scrape real data.')}</div>`;
     return;
   }
 
   const cardHtml = (c) => {
     const isIntern = (c.type || 'hackathon') === 'internship';
-    const badge = c.typeDisplay || (isIntern ? '💼 INTERNSHIP' : '🏆 HACKATHON');
+    const badge = c.typeDisplay || (isIntern ? 'INTERNSHIP' : 'HACKATHON');
     const metaBits = [
       c.mode ? c.mode : '',
       c.location ? c.location : '',
@@ -472,19 +472,19 @@ function renderDiscoverGrid() {
         </div>
         <div class="d-card-body">
           ${c.summary ? `<p>${escHtml(c.summary)}</p>` : ''}
-          ${c.whatToBuild ? `<p style="margin-top:6px"><strong>What to build:</strong> ${escHtml(c.whatToBuild)}</p>` : ''}
-          ${c.prize ? `<p style="margin-top:6px"><span class="d-prize">💰 ${escHtml(c.prize)}</span></p>` : ''}
-          ${isIntern && c.company ? `<p style="margin-top:4px">🏢 ${escHtml(c.company)}</p>` : ''}
-          ${metaBits ? `<p style="margin-top:6px">📍 ${escHtml(metaBits)}</p>` : ''}
-          ${cardDateLabel(c) ? `<p style="margin-top:4px">${escHtml(cardDateLabel(c))}</p>` : ''}
+          ${c.whatToBuild ? `<p><strong>What to build:</strong> ${escHtml(c.whatToBuild)}</p>` : ''}
+          ${c.prize ? `<p><span class="d-prize">${escHtml(c.prize)}</span></p>` : ''}
+          ${isIntern && c.company ? `<p>${escHtml(c.company)}</p>` : ''}
+          ${metaBits ? `<p>${escHtml(metaBits)}</p>` : ''}
+          ${cardDateLabel(c) ? `<p>${escHtml(cardDateLabel(c))}</p>` : ''}
         </div>
         ${(c.tags && c.tags.length) ? `<div class="d-card-meta">${c.tags.slice(0, 6).map((t) => `<span class="d-card-tag">${escHtml(t)}</span>`).join('')}</div>` : ''}
         <div class="d-card-foot">
-          ${c.link ? `<a class="d-link" href="${escHtml(c.link)}" target="_blank" rel="noopener">🔗 View details ↗</a>` : ''}
+          ${c.link ? `<a class="d-link" href="${escHtml(c.link)}" target="_blank" rel="noopener">View details ↗</a>` : ''}
           <div class="d-card-actions">
-            <button class="btn-ghost" data-discuss="${escHtml(c.id)}">💬 Discuss</button>
-            <button class="btn-ghost" data-save="${escHtml(c.id)}">💾 Save</button>
-            <button class="btn-ghost-red" data-dismiss="${escHtml(c.id)}">✕ Dismiss</button>
+            <button class="btn-ghost" data-discuss="${escHtml(c.id)}">Discuss</button>
+            <button class="btn-ghost" data-save="${escHtml(c.id)}">Save</button>
+            <button class="btn-ghost-red" data-dismiss="${escHtml(c.id)}">Dismiss</button>
           </div>
         </div>
       </div>`;
@@ -494,10 +494,10 @@ function renderDiscoverGrid() {
   const interns = list.filter((c) => (c.type || 'hackathon') === 'internship');
   const parts = [];
   if (hacks.length) {
-    parts.push(`<div class="disc-section"><div class="disc-section-head hack"><span class="disc-ico">🏆</span> Hackathons <span class="disc-count">${hacks.length}</span><span class="disc-hint">top 20</span></div><div class="disc-cards">${hacks.map(cardHtml).join('')}</div></div>`);
+    parts.push(`<div class="disc-section"><div class="disc-section-head hack"><span class="disc-ico"><svg class="ic"><use href="#i-trophy" /></svg></span> Hackathons <span class="disc-count">${hacks.length}</span><span class="disc-hint">top 20</span></div><div class="disc-cards">${hacks.map(cardHtml).join('')}</div></div>`);
   }
   if (interns.length) {
-    parts.push(`<div class="disc-section"><div class="disc-section-head intern"><span class="disc-ico">💼</span> Internships <span class="disc-count">${interns.length}</span><span class="disc-hint">top 10</span></div><div class="disc-cards">${interns.map(cardHtml).join('')}</div></div>`);
+    parts.push(`<div class="disc-section"><div class="disc-section-head intern"><span class="disc-ico"><svg class="ic"><use href="#i-user" /></svg></span> Internships <span class="disc-count">${interns.length}</span><span class="disc-hint">top 10</span></div><div class="disc-cards">${interns.map(cardHtml).join('')}</div></div>`);
   }
   grid.innerHTML = parts.join('');
 
@@ -550,22 +550,22 @@ async function analyzeGithubProfile(fresh) {
   const urlMatch = raw.match(/github\.com\/([A-Za-z0-9_.-]+)/i);
   if (urlMatch) username = urlMatch[1];
   else if (/^[A-Za-z0-9_.-]+$/.test(raw) && raw.length <= 80) username = raw;
-  else { res.innerHTML = '<div class="empty-msg">⚠️ Invalid input — use https://github.com/username or just a GitHub username.</div>'; return; }
+  else { res.innerHTML = '<div class="empty-msg">Invalid input — use https://github.com/username or just a GitHub username.</div>'; return; }
 
   if (!lockOp('github', $('github-analyze-btn'))) return;
 
   addStudyHistory('github', username, githubLabel(raw));
   renderStudyHistory();
 
-  res.innerHTML = '<div class="empty-msg">⏳ GitHub profile scrape ho raha hai — sab public repos scan ho rahe hain (≈30s)…</div>';
+  res.innerHTML = '<div class="empty-msg">Scanning GitHub profile — reading all public repos (about 30s)…</div>';
   $('github-qa').style.display = 'none';
   try {
     const data = await apiFetch(`/api/study/github/profile?username=${encodeURIComponent(username)}${fresh ? '&fresh=1' : ''}`);
-    if (data.error) { res.innerHTML = `<div class="empty-msg">⚠️ ${escHtml(data.message || data.error)}</div>`; return; }
+    if (data.error) { res.innerHTML = `<div class="empty-msg">${escHtml(data.message || data.error)}</div>`; return; }
     window._ghProfile = data;
     renderGithubProfile(data);
   } catch (err) {
-    res.innerHTML = `<div class="empty-msg">⚠️ ${escHtml(err.message)}</div>`;
+    res.innerHTML = `<div class="empty-msg">${escHtml(err.message)}</div>`;
   } finally {
     unlockOp('github', $('github-analyze-btn'));
   }
@@ -591,20 +591,20 @@ function renderGithubProfile(data) {
           </p>
           ${p.bio ? `<p class="ws-item-sub" style="margin-top:6px;font-style:italic">${escHtml(p.bio)}</p>` : ''}
           <div class="gh-stats-row">
-            <span>📦 ${s.totalRepos ?? repos.length} repos</span>
-            <span>⭐ ${s.totalStars ?? 0} stars</span>
-            <span>⑂ ${s.totalForks ?? 0} forks</span>
-            <span>👥 ${p.followers ?? 0} followers</span>
-            ${s.topLanguages ? `<span>🧬 ${escHtml(s.topLanguages)}</span>` : ''}
+            <span>${s.totalRepos ?? repos.length} repos</span>
+            <span>${s.totalStars ?? 0} stars</span>
+            <span>${s.totalForks ?? 0} forks</span>
+            <span>${p.followers ?? 0} followers</span>
+            ${s.topLanguages ? `<span>${escHtml(s.topLanguages)}</span>` : ''}
           </div>
         </div>
       </div>
       ${data.overview ? `<div class="gh-overview-text">${mdToHtml(data.overview)}</div>` : ''}
       <p class="ws-item-sub" style="margin-top:8px;font-size:11px;opacity:0.7">
         Scraped ${s.readmesSummarized ?? 0} READMEs · ${(s.contentChars ?? 0).toLocaleString()} chars
-        ${data.meta?.auth === 'token' ? ' · 🔑 authenticated' : ' · anonymous'}
+        ${data.meta?.auth === 'token' ? ' · authenticated' : ' · anonymous'}
       </p>
-      <button class="btn-outline cc-open-btn" id="github-profile-discuss-btn">💬 Discuss with Ek Sathi</button>
+      <button class="btn-outline cc-open-btn" id="github-profile-discuss-btn">Discuss with Ek Sathi</button>
     </div>`;
 
   let cardsHtml = '<div class="gh-repo-grid">';
@@ -616,9 +616,9 @@ function renderGithubProfile(data) {
           <span class="gh-lang-dot" style="background:${color}"></span>
           <h4 class="gh-repo-name">${escHtml(r.name)}</h4>
           <div class="gh-repo-badges">
-            <span class="gh-badge">⭐ ${r.stars ?? 0}</span>
-            <span class="gh-badge">⑂ ${r.forks ?? 0}</span>
-            ${r.commits != null ? `<span class="gh-badge">📝 ${r.commits}</span>` : ''}
+            <span class="gh-badge">${r.stars ?? 0}</span>
+            <span class="gh-badge">${r.forks ?? 0}</span>
+            ${r.commits != null ? `<span class="gh-badge">${r.commits}</span>` : ''}
           </div>
         </div>
         <p class="ws-item-sub" style="margin:0">${escHtml(r.description ? r.description.slice(0, 130) : 'No description')}</p>
@@ -659,9 +659,9 @@ async function openRepoModal(fullName) {
   overlay.style.display = 'flex';
   window._ghModalRepo = fullName;
 
-  $('gh-modal-header').innerHTML = `<h3 style="margin:0 0 4px">📦 ${escHtml(fullName)}</h3>
+  $('gh-modal-header').innerHTML = `<h3 style="margin:0 0 4px">${escHtml(fullName)}</h3>
     <a class="d-link" href="https://github.com/${escHtml(fullName)}" target="_blank" rel="noopener">Open on GitHub ↗</a>`;
-  $('gh-modal-body').innerHTML = '<div class="empty-msg">⏳ Full repo analysis — README + key source files read…</div>';
+  $('gh-modal-body').innerHTML = '<div class="empty-msg">Full analysis in progress — reading README and key source files…</div>';
   $('gh-modal-qa').style.display = 'none';
   $('gh-modal-messages').style.display = 'none';
   $('gh-modal-messages').innerHTML = '';
@@ -672,10 +672,10 @@ async function openRepoModal(fullName) {
       $('gh-modal-body').innerHTML = mdToHtml(data.explanation || 'No explanation generated.');
       $('gh-modal-qa').style.display = 'flex';
     } else {
-      $('gh-modal-body').innerHTML = `<div class="empty-msg">⚠️ ${escHtml(data.message || 'Analysis failed')}</div>`;
+      $('gh-modal-body').innerHTML = `<div class="empty-msg">${escHtml(data.message || 'Analysis failed')}</div>`;
     }
   } catch (err) {
-    $('gh-modal-body').innerHTML = `<div class="empty-msg">⚠️ ${escHtml(err.message)}</div>`;
+    $('gh-modal-body').innerHTML = `<div class="empty-msg">${escHtml(err.message)}</div>`;
   }
 }
 
@@ -693,15 +693,15 @@ async function askModalRepo() {
   const msgs = $('gh-modal-messages');
   msgs.style.display = 'flex';
   hackMsgInto(msgs, 'user', q);
-  const typing = hackMsgInto(msgs, 'assistant', '⏳ Looking for answer…');
+  const typing = hackMsgInto(msgs, 'assistant', 'Looking for an answer…');
   try {
     const data = await apiFetch('/api/study/github/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: `https://github.com/${repo}`, question: q }) });
     typing.remove();
     if (data.status === 'ok') hackMsgInto(msgs, 'assistant', data.answer || '…');
-    else hackMsgInto(msgs, 'assistant', '⚠️ ' + (data.message || 'No answer found.'));
+    else hackMsgInto(msgs, 'assistant', data.message || 'No answer found.');
   } catch (err) {
     typing.remove();
-    hackMsgInto(msgs, 'assistant', '⚠️ ' + err.message);
+    hackMsgInto(msgs, 'assistant', err.message);
   } finally {
     unlockOp('gh-modal');
   }
@@ -710,19 +710,19 @@ async function askModalRepo() {
 async function askGitHub() {
   const q = $('github-question').value.trim();
   const input = $('github-input').value.trim();
-  if (!q || !input) { alert('Pehle repo analyze karo, phir sawaal likho.'); return; }
+  if (!q || !input) { alert('Analyze a repo first, then ask your question.'); return; }
   $('github-question').value = '';
   const isUrl = /^https?:\/\//i.test(input);
   hackMsgInto($('github-messages'), 'user', q);
-  const typing = hackMsgInto($('github-messages'), 'assistant', '⏳ Sawaal ka jawab dhoondh raha hu…');
+  const typing = hackMsgInto($('github-messages'), 'assistant', 'Looking for an answer…');
   try {
     const data = await apiFetch('/api/study/github/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: isUrl ? input : undefined, text: isUrl ? undefined : input, question: q }) });
     typing.remove();
     if (data.status === 'ok') hackMsgInto($('github-messages'), 'assistant', data.answer || '…');
-    else hackMsgInto($('github-messages'), 'assistant', '⚠️ ' + (data.message || 'Jawab nahi mila'));
+    else hackMsgInto($('github-messages'), 'assistant', (data.message || 'No answer received'));
   } catch (err) {
     typing.remove();
-    hackMsgInto($('github-messages'), 'assistant', '⚠️ ' + err.message);
+    hackMsgInto($('github-messages'), 'assistant', err.message);
   }
 }
 
@@ -739,11 +739,11 @@ async function analyzeWebsite(fresh) {
   const res = $('website-results');
   addStudyHistory('website', url, domainLabel(url));
   renderStudyHistory();
-  res.innerHTML = '<div class="empty-msg">⏳ Deep website scrape ho raha hai — home + internal pages + CSS scan (≈20-30s)…</div>';
+  res.innerHTML = '<div class="empty-msg">Scanning website — home + internal pages + CSS (about 20-30s)…</div>';
   try {
     const data = await apiFetch('/api/study/website', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, ...(fresh ? { fresh: 1 } : {}) }) });
     if (data.status !== 'ok') {
-      res.innerHTML = `<div class="empty-msg">⚠️ ${escHtml(data.message || 'Website scrape nahi ho paya')}</div>`;
+      res.innerHTML = `<div class="empty-msg">${escHtml(data.message || 'Website could not be scraped')}</div>`;
       return;
     }
     const d = data;
@@ -760,7 +760,7 @@ async function analyzeWebsite(fresh) {
       return arr.length ? `<div class="site-chip-row"><span class="site-chip-label">${label}</span>${arr.map(x => `<span class="site-chip">${escHtml(String(x))}</span>`).join('')}</div>` : '';
     };
 
-    const fontsRow = (design.fonts || []).map(f => `<span class="site-chip site-chip-font">🔤 ${escHtml(f.name)}<i> ×${f.weight}</i></span>`).join('');
+    const fontsRow = (design.fonts || []).map(f => `<span class="site-chip site-chip-font">${escHtml(f.name)}<i> ×${f.weight}</i></span>`).join('');
     const pagesRow = (d.pages || []).slice(0, 12).map(p => {
       const u = p.url || '';
       return `<a class="site-page-link" href="${escHtml(u)}" target="_blank" rel="noopener">${escHtml(p.title || u)} ↗</a>`;
@@ -769,27 +769,27 @@ async function analyzeWebsite(fresh) {
     res.innerHTML = `
       <div class="gh-profile-overview">
         <div class="gh-profile-top">
-          ${d.favicon ? `<img class="site-favicon" src="${escHtml(d.favicon)}" onerror="this.style.display='none'" alt=""/>` : '<span class="site-favicon site-favicon-empty">🌐</span>'}
+          ${d.favicon ? `<img class="site-favicon" src="${escHtml(d.favicon)}" onerror="this.style.display='none'" alt=""/>` : '<span class="site-favicon site-favicon-empty">WWW</span>'}
           <div class="gh-profile-info">
-            <h3 style="margin:0 0 2px">🌐 ${escHtml(d.title || d.url || url)}</h3>
+            <h3 style="margin:0 0 2px">${escHtml(d.title || d.url || url)}</h3>
             ${d.description ? `<p class="ws-item-sub" style="margin:0 0 4px">${escHtml(d.description)}</p>` : ''}
             <p class="ws-item-sub" style="margin:0">${escHtml(d.scrapeMeta || '')} ${(d.jsonLdTypes || []).length ? '· <b>JSON-LD:</b> ' + escHtml(d.jsonLdTypes.slice(0, 4).join(', ')) : ''}</p>
           </div>
         </div>
-        ${chipRow('🧩 Frameworks', [...(stack.frameworks || []), ...(stack.cms || []), ...(stack.ssg || [])])}
-        ${chipRow('🎨 Styling', stack.styling)}
-        ${chipRow('📚 Libraries', stack.libraries)}
-        ${chipRow('⚙️ Runtime', stack.runtime)}
-        ${swatches ? `<div class="site-chip-row"><span class="site-chip-label">🎨 Color palette (${(design.colors || []).length})</span><span class="site-swatch-row">${swatches}</span></div>` : ''}
-        ${fontsRow ? `<div class="site-chip-row"><span class="site-chip-label">🔤 Fonts (${(design.fonts || []).length})</span>${fontsRow}</div>` : ''}
-        ${pagesRow ? `<div class="site-chip-row site-pages-row"><span class="site-chip-label">📄 Pages (${(d.pages || []).length})</span><span class="site-pages">${pagesRow}</span></div>` : ''}
-        <div class="site-analysis">${d.analysis ? mdToHtml(d.analysis) : '<p class="ws-item-sub">Bhaasha analysis generate nahi ho paya — upar ke extracted facts dekh lo.</p>'}</div>
-        <button class="btn-outline cc-open-btn" id="website-discuss-btn">💬 Discuss with Ek Sathi</button>
+        ${chipRow('Frameworks', [...(stack.frameworks || []), ...(stack.cms || []), ...(stack.ssg || [])])}
+        ${chipRow('Styling', stack.styling)}
+        ${chipRow('Libraries', stack.libraries)}
+        ${chipRow('Runtime', stack.runtime)}
+        ${swatches ? `<div class="site-chip-row"><span class="site-chip-label">Color palette (${(design.colors || []).length})</span><span class="site-swatch-row">${swatches}</span></div>` : ''}
+        ${fontsRow ? `<div class="site-chip-row"><span class="site-chip-label">Fonts (${(design.fonts || []).length})</span>${fontsRow}</div>` : ''}
+        ${pagesRow ? `<div class="site-chip-row site-pages-row"><span class="site-chip-label">Pages (${(d.pages || []).length})</span><span class="site-pages">${pagesRow}</span></div>` : ''}
+        <div class="site-analysis">${d.analysis ? mdToHtml(d.analysis) : '<p class="ws-item-sub">Full analysis could not be generated — the extracted facts above are available.</p>'}</div>
+        <button class="btn-outline cc-open-btn" id="website-discuss-btn">Discuss with Ek Sathi</button>
       </div>`;
     const db = $('website-discuss-btn');
     if (db) db.addEventListener('click', () => openContextChat(websiteSubject(d), CC_SUGGEST.website));
   } catch (err) {
-    res.innerHTML = `<div class="empty-msg">⚠️ ${escHtml(err.message)}</div>`;
+    res.innerHTML = `<div class="empty-msg">${escHtml(err.message)}</div>`;
   } finally {
     unlockOp('website', $('website-analyze-btn'));
   }
@@ -827,7 +827,7 @@ function renderStudyHistory() {
   loadStudyHistory();
   const forKind = (kind) => _studyHistory
     .filter((h) => h.kind === kind)
-    .map((h) => `<button class="study-history-chip" data-hkind="${kind}" data-hlabel="${escHtml(h.label)}" title="↻ Re-scrape fresh — changes detect karne ke liye">↻ ${escHtml(h.label)}</button>`)
+    .map((h) => `<button class="study-history-chip" data-hkind="${kind}" data-hlabel="${escHtml(h.label)}" title="Re-scrape fresh to detect changes">${escHtml(h.label)}</button>`)
     .join('');
   const ghEl = $('github-history'), weEl = $('website-history');
   if (ghEl) ghEl.innerHTML = _studyHistory.some(h => h.kind === 'github') ? `<span class="study-history-label">History</span>${forKind('github')}` : '';
@@ -864,19 +864,19 @@ function hackMsgInto(container, role, text) {
 
 /* ── Context Chat drawer (discuss any scraped item) ─────── */
 const CC_TYPE = {
-  hackathon: { icon: '🏆', label: 'Hackathon' },
-  internship: { icon: '💼', label: 'Internship' },
-  website: { icon: '🌐', label: 'Website' },
-  github: { icon: '👤', label: 'GitHub Profile' },
-  repo: { icon: '📦', label: 'GitHub Repo' },
-  resume: { icon: '📄', label: 'Resume' },
+  hackathon: { icon: 'H', label: 'Hackathon' },
+  internship: { icon: 'I', label: 'Internship' },
+  website: { icon: 'W', label: 'Website' },
+  github: { icon: 'G', label: 'GitHub Profile' },
+  repo: { icon: 'R', label: 'GitHub Repo' },
+  resume: { icon: 'A', label: 'Resume' },
 };
 const CC_SUGGEST = {
-  hackathon: ['🎯 Isme main kya bana sakta hu?', '💰 Prize aur deadlines kya hain?', '🙋 Kya main participate karu?', '🧰 Konse skills chahiye?'],
-  internship: ['💼 Ye internship kaisi hai?', '📝 Kya skills chahiye iske liye?', '💰 Stipend kitna hai?', '👀 Apply karna chahiye kya?'],
-  website: ['🎯 Is site ka final goal kya hai?', '🧰 Kis tech se bani hai?', '🎨 Fonts aur color palette batao', '📄 Kin pages pe focus karna chahiye?'],
-  github: ['👤 Is developer ka kaam kaisa hai?', '🧰 Kis tech pe focus karte hain?', '📈 Kya strengths/languages prominent hain?', '🚀 Kaunsa repo sabse valuable hai?'],
-  repo: ['🎯 Ye repo kya karta hai?', '⚙️ Architecture/tech stack kya hai?', '🚀 Kya main isse chalana/build karna seekh sakta hu?', '📂 Kis code se bana hai?'],
+  hackathon: ['What can I build for this event?', 'What are the prizes and deadlines?', 'Should I participate?', 'What skills will I need?'],
+  internship: ['Where can I apply?', 'What skills are needed for this role?', 'Is the stipend reasonable?', 'Strength and drawbacks of this internship?'],
+  website: ['What is the site\'s goal?', 'Which technologies power it?', 'Tell me about its fonts and colors', 'Which pages should I focus on?'],
+  github: ['What is this developer like?', 'Which technologies do they focus on?', 'What strengths and top languages stand out?', 'Which repo is the most valuable?'],
+  repo: ['What does this repo do?', 'What is its architecture and stack?', 'Can I run or build it to learn?', 'Which part of the code should I study?'],
   resume: ['What is my strongest asset?', 'Which keywords am I missing?', 'How can each bullet be improved?', 'What should I highlight for this JD?'],
 };
 let _ccSubject = null;
@@ -902,8 +902,8 @@ function githubProfileSubject(d) {
     `Total forks: ${s.totalForks || 0}`,
     `Top languages: ${s.topLanguages || 'n/a'}`,
     `Profile overview: ${(d.overview || '').slice(0, 2500)}`,
-    ...(repos.length ? ['', 'REPOS (name ⭐stars ⑂forks 📝commits):'] : []),
-    ...repos.map((r) => `• ${r.full_name} [${r.language || '?'}] ⭐${r.stars ?? 0} ⑂${r.forks ?? 0}${r.commits != null ? ' 📝' + r.commits : ''} — ${(r.summary || r.description || '').slice(0, 160)}`),
+    ...(repos.length ? ['', 'REPOS (name | stars | forks | commits):'] : []),
+    ...repos.map((r) => `• ${r.full_name} [${r.language || '?'}] stars:${r.stars ?? 0} forks:${r.forks ?? 0}${r.commits != null ? ' commits:' + r.commits : ''} — ${(r.summary || r.description || '').slice(0, 160)}`),
   ].filter(Boolean).join('\n');
   return { type: 'github', title: (p.name || p.login || 'GitHub Profile'), subtitle: '@' + (p.login || ''), contextText: ctx };
 }
@@ -1213,7 +1213,7 @@ function bindResume() {
   $('resume-clear-btn').addEventListener('click', clearResume);
   $('resume-file').addEventListener('change', () => {
     const f = $('resume-file').files[0];
-    $('resume-file-name').textContent = f ? `📎 ${f.name} (${(f.size / 1024).toFixed(0)} KB)` : '';
+    $('resume-file-name').textContent = f ? `${f.name} (${(f.size / 1024).toFixed(0)} KB)` : '';
     if (f) $('resume-paste').value = '';
   });
 }
@@ -1227,7 +1227,7 @@ function buildContextChat() {
   overlay.innerHTML = `
     <div class="cc-panel">
       <div class="cc-header">
-        <span class="cc-ico" id="cc-ico">🌐</span>
+        <span class="cc-ico" id="cc-ico"></span>
         <div class="cc-id">
           <div class="cc-title" id="cc-title"></div>
           <div class="cc-sub" id="cc-sub"></div>
@@ -1240,8 +1240,8 @@ function buildContextChat() {
       <div class="cc-msgs" id="cc-msgs"></div>
       <div class="cc-chips" id="cc-chips"></div>
       <div class="cc-input-row">
-        <textarea id="cc-input" class="ws-chat-input" rows="1" placeholder="Ek Sathi se baat karo — Enter se bhejo, Shift+Enter se nayi line…"></textarea>
-        <button class="cc-send" id="cc-send" onclick="ccSend()" title="Send">➤</button>
+        <textarea id="cc-input" class="ws-chat-input" rows="1" placeholder="Talk to Ek Sathi — Enter sends, Shift+Enter adds a new line…"></textarea>
+        <button class="cc-send" id="cc-send" onclick="ccSend()" title="Send"><svg class="ic"><use href="#i-send" /></svg></button>
       </div>
     </div>`;
   overlay.addEventListener('click', (e) => { if (e.target === overlay) closeContextChat(); });
@@ -1263,8 +1263,8 @@ async function openContextChat(subject, suggested, opts) {
     _ccProfileRepos = opts.repos;
     $('cc-repo-wrap').style.display = '';
     $('cc-repo-select').innerHTML =
-      '<option value="">👤 Whole profile</option>' +
-      opts.repos.map((r) => `<option value="${escHtml(r.full_name)}">📦 ${escHtml(r.name)}</option>`).join('');
+      '<option value="">Whole profile</option>' +
+      opts.repos.map((r) => `<option value="${escHtml(r.full_name)}">${escHtml(r.name)}</option>`).join('');
     $('cc-repo-select').value = '';
   } else {
     _ccProfileSubject = null;
@@ -1288,7 +1288,7 @@ async function _ccRender(subject, suggested) {
   const chips = $('cc-chips');
   chips.innerHTML = (suggested && suggested.length ? suggested : CC_SUGGEST[subject && subject.type] || CC_SUGGEST.website)
     .map((s) => `<button class="cc-chip" data-q="${escHtml(s)}" onclick="ccSend(this.dataset.q)">${escHtml(s)}</button>`).join('');
-  const title = subject && subject.title ? subject.title : 'ye topic';
+  const title = subject && subject.title ? subject.title : 'this topic';
 
   // Saved card → load its persisted discussion memory and continue from there
   if (_ccPersistId) {
@@ -1297,14 +1297,14 @@ async function _ccRender(subject, suggested) {
       if (data.status === 'ok' && data.messages && data.messages.length) {
         _ccMessages = data.messages.slice();
         data.messages.forEach((m) => hackMsgInto(msgs, m.role === 'user' ? 'user' : 'assistant', m.content));
-        hackMsgInto(msgs, 'assistant', `📌 Yeh baat saved memory se continue ho rahi hai — ${data.messages.length} messages yaad hain. Poochte raho!`);
+        hackMsgInto(msgs, 'assistant', `Continuing from saved memory — ${data.messages.length} earlier messages are available. Ask away!`);
         setTimeout(() => { $('cc-input').focus(); }, 80);
         return;
       }
     } catch (e) { /* memory load failed → fresh start */ }
   }
 
-  hackMsgInto(msgs, 'assistant', `👋 Main **${title}** ki scraped details ke saath discuss kar sakta hu. Jo bhi poochna ho, poocho!`);
+  hackMsgInto(msgs, 'assistant', `I can discuss the scraped details of **${title}**. Ask anything about it!`);
   setTimeout(() => { $('cc-input').focus(); }, 80);
 }
 
@@ -1316,7 +1316,7 @@ function closeContextChat() {
 function ccTypingInto(container) {
   const div = document.createElement('div');
   div.className = 'ws-msg assistant';
-  div.innerHTML = `<div class="ws-msg-role">Ek Sathi</div><div class="ws-msg-text"><span class="typing-indicator"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="typing-label">soch raha hu…</span></span></div>`;
+  div.innerHTML = `<div class="ws-msg-role">Ek Sathi</div><div class="ws-msg-text"><span class="typing-indicator"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="typing-label">thinking…</span></span></div>`;
   container.appendChild(div);
   scrollToBottom(container);
   return div;
@@ -1350,7 +1350,7 @@ async function ccSend(text) {
           hackMsgInto(msgs, 'assistant', data.answer);
         }
       } else {
-        hackMsgInto(msgs, 'assistant', '⚠️ ' + (data.message || data.error || 'Jawab nahi mila'));
+        hackMsgInto(msgs, 'assistant', (data.message || data.error || 'No answer received'));
       }
     } else {
       data = await apiFetch('/api/study/discuss', {
@@ -1363,12 +1363,12 @@ async function ccSend(text) {
         _ccMessages.push({ role: 'assistant', content: data.answer });
         hackMsgInto(msgs, 'assistant', data.answer || '…');
       } else {
-        hackMsgInto(msgs, 'assistant', '⚠️ ' + (data.message || data.error || 'Jawab nahi mila'));
+        hackMsgInto(msgs, 'assistant', (data.message || data.error || 'No answer received'));
       }
     }
   } catch (err) {
     typing.remove();
-    hackMsgInto(msgs, 'assistant', '⚠️ ' + err.message);
+    hackMsgInto(msgs, 'assistant', err.message);
   } finally {
     unlockOp('cc-send', $('cc-send'));
     inp.focus();
