@@ -604,6 +604,7 @@ function renderGithubProfile(data) {
         Scraped ${s.readmesSummarized ?? 0} READMEs · ${(s.contentChars ?? 0).toLocaleString()} chars
         ${data.meta?.auth === 'token' ? ' · 🔑 authenticated' : ' · anonymous'}
       </p>
+      <button class="btn-outline cc-open-btn" id="github-profile-discuss-btn">💬 Discuss with Ek Sathi</button>
     </div>`;
 
   let cardsHtml = '<div class="gh-repo-grid">';
@@ -631,6 +632,8 @@ function renderGithubProfile(data) {
   cardsHtml += '</div>';
 
   res.innerHTML = profileHtml + cardsHtml;
+  const pb = $('github-profile-discuss-btn');
+  if (pb) pb.addEventListener('click', () => openContextChat(githubProfileSubject(data), CC_SUGGEST.github, { repos: data.repos || [] }));
 }
 
 async function openRepoModal(fullName) {
@@ -892,16 +895,70 @@ const CC_TYPE = {
   hackathon: { icon: '🏆', label: 'Hackathon' },
   internship: { icon: '💼', label: 'Internship' },
   website: { icon: '🌐', label: 'Website' },
+  github: { icon: '👤', label: 'GitHub Profile' },
   repo: { icon: '📦', label: 'GitHub Repo' },
 };
 const CC_SUGGEST = {
   hackathon: ['🎯 Isme main kya bana sakta hu?', '💰 Prize aur deadlines kya hain?', '🙋 Kya main participate karu?', '🧰 Konse skills chahiye?'],
   internship: ['💼 Ye internship kaisi hai?', '📝 Kya skills chahiye iske liye?', '💰 Stipend kitna hai?', '👀 Apply karna chahiye kya?'],
   website: ['🎯 Is site ka final goal kya hai?', '🧰 Kis tech se bani hai?', '🎨 Fonts aur color palette batao', '📄 Kin pages pe focus karna chahiye?'],
+  github: ['👤 Is developer ka kaam kaisa hai?', '🧰 Kis tech pe focus karte hain?', '📈 Kya strengths/languages prominent hain?', '🚀 Kaunsa repo sabse valuable hai?'],
+  repo: ['🎯 Ye repo kya karta hai?', '⚙️ Architecture/tech stack kya hai?', '🚀 Kya main isse chalana/build karna seekh sakta hu?', '📂 Kis code se bana hai?'],
 };
 let _ccSubject = null;
 let _ccMessages = [];
 let _ccPersistId = null;
+let _ccProfileSubject = null;
+let _ccProfileRepos = [];
+
+function githubProfileSubject(d) {
+  const p = d.profile || {};
+  const s = d.stats || {};
+  const repos = d.repos || [];
+  const ctx = [
+    'Type: GitHub Profile',
+    `Login: ${p.login || ''}`,
+    `Name: ${p.name || ''}`,
+    `Bio: ${p.bio || ''}`,
+    `Location: ${p.location || ''}`,
+    `Company: ${p.company || ''}`,
+    `Public repos: ${p.publicRepos ?? repos.length}`,
+    `Followers: ${p.followers || 0}`,
+    `Total stars: ${s.totalStars || 0}`,
+    `Total forks: ${s.totalForks || 0}`,
+    `Top languages: ${s.topLanguages || 'n/a'}`,
+    `Profile overview: ${(d.overview || '').slice(0, 2500)}`,
+    ...(repos.length ? ['', 'REPOS (name ⭐stars ⑂forks 📝commits):'] : []),
+    ...repos.map((r) => `• ${r.full_name} [${r.language || '?'}] ⭐${r.stars ?? 0} ⑂${r.forks ?? 0}${r.commits != null ? ' 📝' + r.commits : ''} — ${(r.summary || r.description || '').slice(0, 160)}`),
+  ].filter(Boolean).join('\n');
+  return { type: 'github', title: (p.name || p.login || 'GitHub Profile'), subtitle: '@' + (p.login || ''), contextText: ctx };
+}
+
+function repoSubject(r) {
+  if (!r) return null;
+  const ctx = [
+    'Type: GitHub Repo',
+    `Name: ${r.full_name || r.name}`,
+    `Language: ${r.language || ''}`,
+    `Stars: ${r.stars ?? ''}`,
+    `Forks: ${r.forks ?? ''}`,
+    `Commits: ${r.commits != null ? r.commits : 'unknown'}`,
+    `Last updated: ${r.updated_at || ''}`,
+    `Description: ${r.description || ''}`,
+    `Summary (from README): ${(r.summary || '').slice(0, 2000)}`,
+    `Open: https://github.com/${r.full_name || r.name}`,
+  ].filter(Boolean).join('\n');
+  return { type: 'repo', title: (r.full_name || r.name || 'Repository'), subtitle: (r.language || 'GitHub Repo'), contextText: ctx };
+}
+
+async function ccRepoChanged(value) {
+  if (!_ccProfileSubject) return;
+  if (value && _ccProfileRepos.length) {
+    const r = _ccProfileRepos.find((x) => x.full_name === value);
+    if (r) { await _ccRender(repoSubject(r)); return; }
+  }
+  await _ccRender(_ccProfileSubject);
+}
 
 function buildContextChat() {
   let overlay = $('context-chat');
@@ -919,6 +976,9 @@ function buildContextChat() {
         </div>
         <button class="cc-close" onclick="closeContextChat()" title="Close">✕</button>
       </div>
+      <div class="cc-repo-wrap" id="cc-repo-wrap" style="display:none">
+        <select class="cc-repo-select" id="cc-repo-select" onchange="ccRepoChanged(this.value)"></select>
+      </div>
       <div class="cc-msgs" id="cc-msgs"></div>
       <div class="cc-chips" id="cc-chips"></div>
       <div class="cc-input-row">
@@ -934,13 +994,34 @@ function buildContextChat() {
   return overlay;
 }
 
-async function openContextChat(subject, suggested) {
+async function openContextChat(subject, suggested, opts) {
+  opts = opts || {};
+  const o = buildContextChat();
+  o.classList.add('open');
+
+  // GitHub profile drawer: repo dropdown above the messages
+  if (opts.repos && opts.repos.length) {
+    _ccProfileSubject = subject;
+    _ccProfileRepos = opts.repos;
+    $('cc-repo-wrap').style.display = '';
+    $('cc-repo-select').innerHTML =
+      '<option value="">👤 Whole profile</option>' +
+      opts.repos.map((r) => `<option value="${escHtml(r.full_name)}">📦 ${escHtml(r.name)}</option>`).join('');
+    $('cc-repo-select').value = '';
+  } else {
+    _ccProfileSubject = null;
+    _ccProfileRepos = [];
+    $('cc-repo-wrap').style.display = 'none';
+  }
+
+  await _ccRender(subject, suggested);
+}
+
+async function _ccRender(subject, suggested) {
   const meta = CC_TYPE[subject && subject.type] || CC_TYPE.website;
   _ccPersistId = (subject && subject.id) ? String(subject.id) : null;
   _ccSubject = subject;
   _ccMessages = [];
-  const o = buildContextChat();
-  o.classList.add('open');
   $('cc-ico').textContent = meta.icon;
   $('cc-title').textContent = subject && subject.title ? subject.title : 'Discussion';
   $('cc-sub').textContent = (subject && subject.subtitle) || meta.label;

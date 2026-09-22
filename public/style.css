@@ -744,6 +744,16 @@ button { font-family: inherit; }
 }
 .study-history-chip:hover { background: rgba(var(--accent-rgb), 0.1); border-color: var(--accent); color: var(--accent); }
 
+/* ═══ CONTEXT CHAT REPO DROPDOWN ═══ */
+
+.cc-repo-wrap { flex-shrink: 0; display: flex; padding: 8px 14px 2px; gap: 8px; }
+.cc-repo-select {
+  flex: 1; background: var(--surface); border: 1px solid var(--border2);
+  border-radius: var(--radius-sm); color: var(--text); padding: 8px 10px;
+  font-size: 12.5px; font-family: inherit; outline: none; cursor: pointer;
+}
+.cc-repo-select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.1); }
+
 /* ═══ RESPONSIVE ═══ */
 
 @media (max-width: 860px) {
