@@ -249,13 +249,27 @@ function clearAttachments() {
 }
 
 /* ── Chat: send ────────────────────────────────────────── */
+/* ── In-flight request lock ────────────────────────────── */
+const _opBusy = {};
+function lockOp(name, btn) {
+  if (_opBusy[name]) return false;
+  _opBusy[name] = true;
+  if (btn) btn.disabled = true;
+  return true;
+}
+function unlockOp(name, btn) {
+  _opBusy[name] = false;
+  if (btn) btn.disabled = false;
+}
+
+/* ── Chat send ─────────────────────────────────────────── */
 async function sendMessage() {
   const input = $('message-input');
   const text = input.value.trim();
   if (!text) return;
+  if (!lockOp('chat', $('send-btn'))) return;
   input.value = '';
   input.style.height = 'auto';
-  $('send-btn').disabled = true;
   if (!currentSessionId) currentSessionId = await createSession();
   const docs = attachedFiles.map((f) => ({ id: f.id, name: f.name }));
   appendMessage('user', text);
@@ -280,7 +294,7 @@ async function sendMessage() {
     typing.remove();
     appendMessage('assistant', '⚠️ ' + (err.message || 'Something went wrong.'));
   } finally {
-    $('send-btn').disabled = false;
+    unlockOp('chat', $('send-btn'));
     $('message-input').focus();
   }
 }
@@ -381,7 +395,7 @@ async function loadDiscoverCards() {
 
 async function scanNow() {
   const btn = $('hack-scan-btn');
-  btn.disabled = true;
+  if (!lockOp('scan', btn)) return;
   setScanStatus('⏳ Scraping Devpost · Unstop · Devfolio · HackerEarth · MLH · Internshala…', true);
   try {
     const data = await apiFetch('/api/hackathons/discover/run', { method: 'POST' });
@@ -396,7 +410,7 @@ async function scanNow() {
   } catch (err) {
     setScanStatus('⚠️ ' + err.message, false);
   } finally {
-    btn.disabled = false;
+    unlockOp('scan', btn);
   }
 }
 
@@ -488,6 +502,8 @@ function renderDiscoverGrid() {
   grid.innerHTML = parts.join('');
 
   grid.querySelectorAll('[data-save]').forEach((b) => b.addEventListener('click', async () => {
+    if (b.disabled) return;
+    b.disabled = true;
     const id = b.dataset.save;
     try {
       await apiFetch(`/api/hackathons/discover/${id}/save`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ participating: false }) });
@@ -499,13 +515,17 @@ function renderDiscoverGrid() {
       await loadDiscoverCards();
       await loadSavedCards();
     } catch (err) { alert('Save failed: ' + err.message); }
+    finally { b.disabled = false; }
   }));
   grid.querySelectorAll('[data-dismiss]').forEach((b) => b.addEventListener('click', async () => {
+    if (b.disabled) return;
+    b.disabled = true;
     const id = b.dataset.dismiss;
     try {
       await apiFetch(`/api/hackathons/discover/${id}/dismiss`, { method: 'POST' });
       await loadDiscoverCards();
     } catch (err) { alert('Dismiss failed: ' + err.message); }
+    finally { b.disabled = false; }
   }));
   grid.querySelectorAll('[data-discuss]').forEach((b) => b.addEventListener('click', () => {
     const card = discoverCards.find((x) => x.id === b.dataset.discuss);
@@ -532,6 +552,8 @@ async function analyzeGithubProfile(fresh) {
   else if (/^[A-Za-z0-9_.-]+$/.test(raw) && raw.length <= 80) username = raw;
   else { res.innerHTML = '<div class="empty-msg">⚠️ Invalid input — use https://github.com/username or just a GitHub username.</div>'; return; }
 
+  if (!lockOp('github', $('github-analyze-btn'))) return;
+
   addStudyHistory('github', username, githubLabel(raw));
   renderStudyHistory();
 
@@ -544,6 +566,8 @@ async function analyzeGithubProfile(fresh) {
     renderGithubProfile(data);
   } catch (err) {
     res.innerHTML = `<div class="empty-msg">⚠️ ${escHtml(err.message)}</div>`;
+  } finally {
+    unlockOp('github', $('github-analyze-btn'));
   }
 }
 
@@ -661,6 +685,7 @@ async function askModalRepo() {
   const q = $('gh-modal-question').value.trim();
   const repo = window._ghModalRepo;
   if (!q || !repo) return;
+  if (!lockOp('gh-modal')) return;
   $('gh-modal-question').value = '';
   const msgs = $('gh-modal-messages');
   msgs.style.display = 'flex';
@@ -674,6 +699,8 @@ async function askModalRepo() {
   } catch (err) {
     typing.remove();
     hackMsgInto(msgs, 'assistant', '⚠️ ' + err.message);
+  } finally {
+    unlockOp('gh-modal');
   }
 }
 
@@ -705,6 +732,7 @@ function domainLabel(raw) {
 async function analyzeWebsite(fresh) {
   const url = $('website-input').value.trim();
   if (!url) return;
+  if (!lockOp('website', $('website-analyze-btn'))) return;
   const res = $('website-results');
   addStudyHistory('website', url, domainLabel(url));
   renderStudyHistory();
@@ -763,6 +791,8 @@ async function analyzeWebsite(fresh) {
     if (db) db.addEventListener('click', () => openContextChat(websiteSubject(d), CC_SUGGEST.website));
   } catch (err) {
     res.innerHTML = `<div class="empty-msg">⚠️ ${escHtml(err.message)}</div>`;
+  } finally {
+    unlockOp('website', $('website-analyze-btn'));
   }
 }
 
@@ -825,6 +855,7 @@ async function askWebsite() {
   const q = $('website-question').value.trim();
   const url = $('website-input').value.trim();
   if (!q || !url) { alert('Pehle website analyze karo, phir sawaal likho.'); return; }
+  if (!lockOp('website-ask', $('website-ask-btn'))) return;
   $('website-question').value = '';
   hackMsgInto($('website-messages'), 'user', q);
   const typing = hackMsgInto($('website-messages'), 'assistant', '⏳ Sawaal ka jawab dhoondh raha hu…');
@@ -839,6 +870,8 @@ async function askWebsite() {
   } catch (err) {
     typing.remove();
     hackMsgInto($('website-messages'), 'assistant', '⚠️ ' + err.message);
+  } finally {
+    unlockOp('website-ask', $('website-ask-btn'));
   }
 }
 
@@ -954,6 +987,7 @@ async function ccSend(text) {
   const inp = $('cc-input');
   const q = typeof text === 'string' ? text.trim() : (inp.value || '').trim();
   if (!q || !_ccSubject) return;
+  if (!lockOp('cc-send', $('cc-send'))) return;
   inp.value = '';
   inp.style.height = 'auto';
   const msgs = $('cc-msgs');
@@ -961,8 +995,6 @@ async function ccSend(text) {
   _ccMessages.push({ role: 'user', content: q });
   hackMsgInto(msgs, 'user', q);
   const typing = ccTypingInto(msgs);
-  const send = $('cc-send');
-  send.disabled = true;
   try {
     let data;
     if (_ccPersistId) {
@@ -999,7 +1031,7 @@ async function ccSend(text) {
     typing.remove();
     hackMsgInto(msgs, 'assistant', '⚠️ ' + err.message);
   } finally {
-    send.disabled = false;
+    unlockOp('cc-send', $('cc-send'));
     inp.focus();
   }
 }
