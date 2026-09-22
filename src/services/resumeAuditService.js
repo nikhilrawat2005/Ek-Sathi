@@ -38,10 +38,39 @@ function totalYears(text) {
   return Math.max(0, (Math.max(...yrs) - Math.min(...yrs)) || 1);
 }
 
-function classifyLinks(text) {
+function collectUrls(text, extraUrls) {
+  const out = [];
+  const push = (u) => {
+    u = String(u || '').trim().replace(/[.,;:!?)\]]+$/, '');
+    if (/^https?:\/\//i.test(u) && out.indexOf(u) === -1) out.push(u);
+  };
+  (String(text || '').match(URL_RE) || []).forEach(push);
+  (Array.isArray(extraUrls) ? extraUrls : []).forEach(push);
+  return out;
+}
+
+// PDF hyperlinks live in /URI annotations, NOT in the text layer — pdf-parse
+// only returns visible text (e.g. "GitHub | LinkedIn" labels), so plain text
+// scraping misses the actual destination URLs. Read them straight from bytes.
+function extractPdfUris(fileBuffer) {
+  const raw = Buffer.isBuffer(fileBuffer) ? fileBuffer.toString('latin1') : String(fileBuffer || '');
+  const out = [];
+  const push = (u) => {
+    u = String(u || '').trim().replace(/[.,;:!?)\]]+$/, '');
+    if (/^https?:\/\//i.test(u) && out.indexOf(u) === -1) out.push(u);
+  };
+  let m;
+  const paren = /\/URI\s*\(([^()]*)\)/g;
+  while ((m = paren.exec(raw)) && out.length < 12) { let u = m[1]; try { u = decodeURIComponent(u); } catch (e) { /* keep raw */ } push(u); }
+  const hex = /\/URI\s*<([0-9a-fA-F]+)>/g;
+  while ((m = hex.exec(raw)) && out.length < 12) { try { push(Buffer.from(m[1], 'hex').toString('latin1')); } catch (e) { /* ignore */ } }
+  return out;
+}
+
+function classifyLinks(urls) {
   const hosts = { github: false, linkedin: false, portfolio: false };
-  for (const raw of (String(text || '').match(URL_RE) || [])) {
-    try { const u = new URL(raw.replace(/[.,;:!?)\]]+$/, '')); hosts.github = hosts.github || /github\.com$/i.test(u.hostname); hosts.linkedin = hosts.linkedin || /linkedin\.com$/i.test(u.hostname); hosts.portfolio = hosts.portfolio || !(/github\.com|linkedin\.com/i.test(u.hostname)); } catch (e) { /* ignore */ }
+  for (const raw of (Array.isArray(urls) ? urls : [])) {
+    try { const u = new URL(raw); hosts.github = hosts.github || /github\.com$/i.test(u.hostname); hosts.linkedin = hosts.linkedin || /linkedin\.com$/i.test(u.hostname); hosts.portfolio = hosts.portfolio || !(/github\.com|linkedin\.com/i.test(u.hostname)); } catch (e) { /* ignore */ }
   }
   return hosts;
 }
@@ -102,14 +131,8 @@ const hasPhone = (text) => /(\+?\d[\s-]?){9,}\d/.test(text) || /(\+91|0091)[\s-]
 const hasLocation = (text) => /,\s*[A-Z][a-zA-Z\u00C0-\u024F ]{2,}\b/.test(text) || /\b(India|United\s?States|USA|UK|London|New\s?York|San\s?Francisco|Bangalore|Bengaluru|Hyderabad|Pune|Delhi|Noida|Gurugram|Ghaziabad|Toronto|Berlin|Singapore)\b/i.test(text);
 const matchDates = (text) => (text.match(/(19|20)\d{2}/g) || []).length;
 
-async function checkLinks(text) {
-  const urls = [];
-  for (const raw of (text.match(URL_RE) || [])) {
-    let u = raw.trim();
-    u = u.replace(/[.,;:!?)\]]+$/, '');
-    if (/^https?:\/\//i.test(u) && urls.indexOf(u) === -1) urls.push(u);
-  }
-  const picked = urls.slice(0, 4);
+async function checkLinks(urls) {
+  const picked = (Array.isArray(urls) ? urls : []).slice(0, 4);
   if (!picked.length) return [];
   return Promise.all(picked.map(async (url) => {
     const ctl = new AbortController();
@@ -142,7 +165,7 @@ const clamp = (n) => Math.max(0, Math.min(100, Math.round(n)));
 
 function gradeOf(v) { return v >= 90 ? 'A+' : v >= 80 ? 'A' : v >= 65 ? 'B' : v >= 50 ? 'C' : 'D'; }
 
-function buildCriteriaGroups({ text, bullets, sections, jd, heuristics, pageCount }) {
+function buildCriteriaGroups({ text, bullets, sections, jd, heuristics, pageCount, urls = [] }) {
   const quantified = countMetrics(bullets);
   const metricFrac = bullets.length ? quantified / bullets.length : 0;
   const filler = bullets.filter((b) => FILLER_PHRASES.some((f) => b.toLowerCase().includes(f)));
@@ -156,7 +179,7 @@ function buildCriteriaGroups({ text, bullets, sections, jd, heuristics, pageCoun
   const specFrac = bullets.length ? spec / bullets.length : 0;
   const dateCount = matchDates(text);
   const years = totalYears(text);
-  const hosts = classifyLinks(text);
+  const hosts = classifyLinks(urls);
   const places = placeholderHits(text);
   const headOk = headersConsistent(sections, text);
   const catOk = categorizedSkills(text);
@@ -447,10 +470,11 @@ function buildHeuristics({ bullets, sections, hasEmailV, hasPhoneV, hasLocV, kv 
   return h;
 }
 
-async function auditResume({ resumeText, targetJobDescription = '', pageCount = null, fileName = '' } = {}) {
+async function auditResume({ resumeText, targetJobDescription = '', pageCount = null, fileName = '', extraUrls = [] } = {}) {
   const text = String(resumeText || '').trim();
   if (text.length < 50) throw new Error(`Resume text too short (${text.length} chars) — minimum 50 characters needed to audit.`);
   const jd = String(targetJobDescription || '').trim();
+  const foundUrls = collectUrls(text, extraUrls);
 
   const bullets = extractBullets(text);
   const sections = detectSections(text);
@@ -462,10 +486,10 @@ async function auditResume({ resumeText, targetJobDescription = '', pageCount = 
     kv: { matched: [], total: 0, source: 'pending' },
   });
 
-  const links = await checkLinks(text);
+  const links = await checkLinks(foundUrls);
   h0.links = links;
 
-  const groups = buildCriteriaGroups({ text, bullets, sections, jd, heuristics: h0, pageCount });
+  const groups = buildCriteriaGroups({ text, bullets, sections, jd, heuristics: h0, pageCount, urls: foundUrls });
   const breakdown = {
     impactAndMetrics: dimScore(groups.impact),
     actionVerbs: dimScore(groups.action),
@@ -530,7 +554,7 @@ async function auditResume({ resumeText, targetJobDescription = '', pageCount = 
 
 async function auditResumeBuffer(fileBuffer, originalName, targetJobDescription = '') {
   const { text, pageCount } = await extractText(fileBuffer, originalName);
-  const audit = await auditResume({ resumeText: text, targetJobDescription, pageCount, fileName: originalName });
+  const audit = await auditResume({ resumeText: text, targetJobDescription, pageCount, fileName: originalName, extraUrls: extractPdfUris(fileBuffer) });
   return { audit, fileName: originalName, charCount: text.length, pageCount: pageCount != null ? pageCount : null };
 }
 
