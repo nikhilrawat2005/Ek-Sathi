@@ -786,10 +786,6 @@ async function analyzeWebsite(fresh) {
         <div class="site-analysis">${d.analysis ? mdToHtml(d.analysis) : '<p class="ws-item-sub">Bhaasha analysis generate nahi ho paya — upar ke extracted facts dekh lo.</p>'}</div>
         <button class="btn-outline cc-open-btn" id="website-discuss-btn">💬 Discuss with Ek Sathi</button>
       </div>`;
-    $('website-qa').style.display = 'flex';
-    $('website-domain').textContent = d.title || d.url || url;
-    $('website-arch').textContent = [...(stack.frameworks || []), ...(stack.cms || []), ...(stack.styling || [])].slice(0, 4).join(', ') || 'website deep-scan';
-    $('website-messages').innerHTML = '';
     const db = $('website-discuss-btn');
     if (db) db.addEventListener('click', () => openContextChat(websiteSubject(d), CC_SUGGEST.website));
   } catch (err) {
@@ -852,30 +848,6 @@ function renderStudyHistory() {
       }
     });
   });
-}
-
-async function askWebsite() {
-  const q = $('website-question').value.trim();
-  const url = $('website-input').value.trim();
-  if (!q || !url) { alert('Pehle website analyze karo, phir sawaal likho.'); return; }
-  if (!lockOp('website-ask', $('website-ask-btn'))) return;
-  $('website-question').value = '';
-  hackMsgInto($('website-messages'), 'user', q);
-  const typing = hackMsgInto($('website-messages'), 'assistant', '⏳ Sawaal ka jawab dhoondh raha hu…');
-  try {
-    const data = await apiFetch('/api/study/website/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, question: q }) });
-    typing.remove();
-    if (data.status === 'ok') {
-      hackMsgInto($('website-messages'), 'assistant', data.answer || '…');
-    } else {
-      hackMsgInto($('website-messages'), 'assistant', '⚠️ ' + (data.message || 'Jawab nahi mila'));
-    }
-  } catch (err) {
-    typing.remove();
-    hackMsgInto($('website-messages'), 'assistant', '⚠️ ' + err.message);
-  } finally {
-    unlockOp('website-ask', $('website-ask-btn'));
-  }
 }
 
 /* shared ws message helper */
@@ -1171,8 +1143,6 @@ function bindStudy() {
   $('github-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') analyzeGithubProfile(); });
   $('website-analyze-btn').addEventListener('click', analyzeWebsite);
   $('website-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') analyzeWebsite(); });
-  $('website-ask-btn').addEventListener('click', askWebsite);
-  $('website-question').addEventListener('keydown', (e) => { if (e.key === 'Enter') askWebsite(); });
   document.querySelectorAll('.study-tab').forEach((tab) => {
     tab.addEventListener('click', () => {
       document.querySelectorAll('.study-tab').forEach((t) => t.classList.toggle('active', t === tab));
