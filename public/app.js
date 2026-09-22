@@ -995,7 +995,7 @@ async function resumeAudit() {
     renderResumeAudit(data);
     $('resume-actionbar').style.display = '';
   } catch (err) {
-    res.innerHTML = `<div class="empty-msg">⚠️ ${escHtml(err.message)}</div>`;
+    res.innerHTML = `<div class="empty-msg">${escHtml(err.message)}</div>`;
   } finally {
     unlockOp('resume-audit', $('resume-audit-btn'));
   }
@@ -1045,8 +1045,9 @@ function renderResumeAudit(data) {
     <div class="re-card">
       <div class="re-head">
         <div class="re-score" style="--re-tone:${tone};--re-pct:${a.atsScore}">
+          <div class="re-score-label">ATS score</div>
           <div class="re-score-num">${a.atsScore}/100</div>
-          <div class="re-verdict">${escHtml(a.verdict)}${a.jdUsed ? ' · targeted' : ''}</div>
+          <div class="re-verdict">${escHtml(a.verdict)}</div>
         </div>
         <div class="re-meta">
           <div class="re-file">${escHtml(data.fileName || 'resume')}</div>
@@ -1089,22 +1090,23 @@ function renderResumeAudit(data) {
     ${(a.topDeductions || []).length ? `
     <div class="re-card">
       <div class="re-card-title">Top Deductions — What Hurts the Score Most</div>
-      ${a.topDeductions.map((d) => `
+      ${a.topDeductions.map((d, i) => `
         <div class="re-deduct">
-          <div class="re-deduct-head"><span class="re-deduct-key">${escHtml(String(d.key || '').split('.').pop())}</span><span class="re-deduct-label">${escHtml(d.label || '')}</span></div>
+          <div class="re-deduct-head"><span class="re-deduct-index">${i + 1}</span><span class="re-deduct-key">${escHtml(String(d.key || '').split('.').pop())}</span><span class="re-deduct-label">${escHtml(d.label || '')}</span></div>
           <div class="re-crit-advice">${escHtml(d.advice || '')}</div>
         </div>`).join('')}
     </div>` : ''}
 
     <div class="re-card">
+      <div class="re-card-title">Executive Summary</div>
       <p class="re-summary">${mdToHtml(a.executiveSummary || '')}</p>
       ${a.contentQuality ? `<p class="re-cq"><span class="re-cq-label">Content Quality — is what is written worth keeping:</span> ${escHtml(a.contentQuality)}</p>` : ''}
       <div class="re-cols">
-        <div class="re-col">
+        <div class="re-col re-col-good">
           <div class="re-col-title">Strengths</div>
           <ul>${(a.strengths || []).map((s) => `<li>${escHtml(s)}</li>`).join('') || '<li class="dim">—</li>'}</ul>
         </div>
-        <div class="re-col">
+        <div class="re-col re-col-bad">
           <div class="re-col-title bad">Critical Negatives</div>
           <ul>${(a.criticalNegatives || []).map((s) => `<li>${escHtml(s)}</li>`).join('') || '<li class="dim">—</li>'}</ul>
         </div>
@@ -1147,7 +1149,7 @@ function renderResumeAudit(data) {
 
     ${(a.bulletImprovements || []).length ? `
     <div class="re-card">
-      <div class="re-col-title">Bullet Rewrites</div>
+      <div class="re-card-title">Bullet Rewrites</div>
       ${a.bulletImprovements.slice(0, 4).map((bi) => `
         <div class="re-rw">
           <div class="re-rw-orig">${escHtml(bi.original || '')}</div>
@@ -1157,7 +1159,7 @@ function renderResumeAudit(data) {
     </div>` : ''}
 
     <div class="re-card">
-      <div class="re-col-title">Action Plan</div>
+      <div class="re-card-title">Action Plan</div>
       <ol class="re-plan">${(a.actionPlan || []).slice(0, 4).map((s) => `<li>${escHtml(s)}</li>`).join('') || ''}</ol>
     </div>`;
   res.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
