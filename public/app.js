@@ -877,7 +877,7 @@ const CC_SUGGEST = {
   website: ['🎯 Is site ka final goal kya hai?', '🧰 Kis tech se bani hai?', '🎨 Fonts aur color palette batao', '📄 Kin pages pe focus karna chahiye?'],
   github: ['👤 Is developer ka kaam kaisa hai?', '🧰 Kis tech pe focus karte hain?', '📈 Kya strengths/languages prominent hain?', '🚀 Kaunsa repo sabse valuable hai?'],
   repo: ['🎯 Ye repo kya karta hai?', '⚙️ Architecture/tech stack kya hai?', '🚀 Kya main isse chalana/build karna seekh sakta hu?', '📂 Kis code se bana hai?'],
-  resume: ['💪 Mera strongest point kya hai?', '🔍 Missing keywords kaunse hain?', '✍️ Har bullet ko kaise improve karu?', '🎯 Is JD ke liye kya highlight karu?'],
+  resume: ['What is my strongest asset?', 'Which keywords am I missing?', 'How can each bullet be improved?', 'What should I highlight for this JD?'],
 };
 let _ccSubject = null;
 let _ccMessages = [];
@@ -954,7 +954,7 @@ function resumeSubject(info) {
     `Top deductions: ${(a.topDeductions || []).map((d) => `${d.label} (${d.key})`).join(' | ') || 'none'}`,
     `Improvement potential: ${a.potentialScore != null ? '~' + a.potentialScore + '/100' : 'n/a'}`,
     `Experience: ${h.totalYears != null ? h.totalYears + ' yr(s)' : 'n/a'} — missing sections: ${(h.missingSections || []).join(', ') || 'none'}${h.summaryPresent === false ? ' (summary missing)' : ''}`,
-    `Social links: ${['github', 'linkedin', 'portfolio'].map((k) => `${k} ${h.social && h.social[k] ? '✅' : '❌'}`).join(', ')}`,
+    `Social links: ${['github', 'linkedin', 'portfolio'].map((k) => `${k} ${h.social && h.social[k] ? 'yes' : 'no'}`).join(', ')}`,
     `Keyword match: ${sm.matched && sm.matched.length ? sm.matched.length + '/' + sm.total + ' (' + sm.source + ')' : 'n/a'} ` + (sm.matched && sm.matched.length ? '— found: ' + sm.matched.slice(0, 12).join(', ') : ''),
     `Sections detected: ${(h.sectionsDetected || []).join(', ') || 'none'}`,
     `Links: ${(a.links || []).map((l) => `${l.status} ${l.url}`).join(' | ') || 'no links found'}`,
@@ -975,10 +975,10 @@ async function resumeAudit() {
   const file = $('resume-file').files[0];
   const text = $('resume-paste').value.trim();
   const jd = $('resume-jd').value.trim();
-  if (!file && text.length < 50) { alert('Resume upload karo (PDF/DOCX/TXT) ya kam se kam 50 chars ka text paste karo.'); return; }
+  if (!file && text.length < 50) { alert('Please upload a resume (PDF/DOCX/TXT) or paste at least 50 characters of text.'); return; }
   if (!lockOp('resume-audit', $('resume-audit-btn'))) return;
   const res = $('resume-results');
-  res.innerHTML = '<div class="empty-msg">⏳ ATS audit chal raha hai… (score local heuristics se, critique AI se)</div>';
+  res.innerHTML = '<div class="empty-msg">Running ATS audit… (score from local heuristics + AI critique)</div>';
   try {
     let data;
     if (file) {
@@ -1004,11 +1004,11 @@ async function resumeAudit() {
 function scoreTone(v) { return v >= 80 ? '#16a34a' : v >= 60 ? '#d97706' : '#dc2626'; }
 
 const RE_GROUP_META = [
-  ['impact', '💪 Impact & Metrics', 'Numbers/proof ke saath results'],
-  ['action', '⚡ Action Verbs', 'Strong opening verbs'],
-  ['format', '🧾 Formatting & Clarity', 'Contact, sections, periods, pages'],
-  ['experience', '🎓 Experience Depth', 'Roles + dates depth'],
-  ['skills', '🎯 Skills & Keywords', 'JD/role keyword alignment'],
+  ['impact', 'Impact & Metrics', 'Quantified, specific, results-driven bullets'],
+  ['action', 'Action Verbs', 'Strong opening verbs; weak verbs avoided'],
+  ['format', 'Formatting & Clarity', 'Contact, sections, punctuation, page'],
+  ['experience', 'Experience Depth', 'Roles, dates, tenure, quantified results'],
+  ['skills', 'Skills & Keywords', 'Alignment with JD / role keywords'],
 ];
 
 function renderResumeAudit(data) {
@@ -1020,11 +1020,11 @@ function renderResumeAudit(data) {
   const gradeOf = (v) => (v == null ? '—' : v >= 90 ? 'A+' : v >= 80 ? 'A' : v >= 65 ? 'B' : v >= 50 ? 'C' : 'D');
   const grades = a.grades || {};
   const bars = [
-    ['impactAndMetrics', 'Impact & Metrics', b.impactAndMetrics, 'quantified bullets ka ratio'],
+    ['impactAndMetrics', 'Impact & Metrics', b.impactAndMetrics, 'share of bullets carrying metrics'],
     ['actionVerbs', 'Action Verbs', b.actionVerbs, 'strong vs weak opening verbs'],
     ['formattingAndClarity', 'Formatting & Clarity', b.formattingAndClarity, 'contact, sections, trailing periods'],
-    ['experienceDepth', 'Experience Depth', b.experienceDepth, 'roles + dates kitne hain'],
-    ['skillsRelevance', 'Skills Relevance', b.skillsRelevance, a.jdUsed ? 'target JD keyword match' : 'generic IT skills match'],
+    ['experienceDepth', 'Experience Depth', b.experienceDepth, 'number of roles and dated history'],
+    ['skillsRelevance', 'Skills Relevance', b.skillsRelevance, a.jdUsed ? 'match against target JD keywords' : 'match against common IT keywords'],
   ];
   const critGroups = RE_GROUP_META.map(([key, title, hint]) => ({
     title, hint,
@@ -1034,11 +1034,11 @@ function renderResumeAudit(data) {
   const sections = a.sectionReview || [];
   const meta = [
     `${data.charCount ? data.charCount + ' chars' : ''}`,
-    a.pageCount != null ? `${a.pageCount} ${a.pageCount === 1 ? 'page' : 'pages'}${a.pageCount > 1 ? ' ⚠️' : ' ✅ single'}` : '',
+    a.pageCount != null ? `${a.pageCount} ${a.pageCount === 1 ? 'page' : 'pages'}${a.pageCount > 1 ? ' — 1 page recommended' : ''}` : '',
     `${h.totalBullets || 0} bullets`,
     sm.total ? `${sm.matched.length}/${sm.total} keywords (${sm.source === 'jd' ? 'JD' : 'generic'})` : '',
     links.length ? `${links.length} links` : '',
-    a.jdUsed ? '🎯 JD targeted' : 'no JD',
+    a.jdUsed ? 'targeted' : 'no JD',
   ].filter(Boolean).map((m) => `<span class="re-meta-chip">${escHtml(m)}</span>`).join('');
   const res = $('resume-results');
   res.innerHTML = `
@@ -1046,12 +1046,12 @@ function renderResumeAudit(data) {
       <div class="re-head">
         <div class="re-score" style="--re-tone:${tone};--re-pct:${a.atsScore}">
           <div class="re-score-num">${a.atsScore}/100</div>
-          <div class="re-verdict">${escHtml(a.verdict)}${a.jdUsed ? ' 🎯 targeted' : ''}</div>
+          <div class="re-verdict">${escHtml(a.verdict)}${a.jdUsed ? ' · targeted' : ''}</div>
         </div>
         <div class="re-meta">
-          <div class="re-file">📄 ${escHtml(data.fileName || 'resume')}</div>
+          <div class="re-file">${escHtml(data.fileName || 'resume')}</div>
           <div class="re-meta-row">${meta}</div>
-          <div class="re-sub">${a.jdUsed ? '🎯 Target JD: ' + escHtml(a.jdUsed.slice(0, 90)) : 'Koi target JD nahi diya — generic IT benchmark use hua. JD paste karoge to exact keyword-alignment milega.'}</div>
+          <div class="re-sub">${a.jdUsed ? 'Target JD: ' + escHtml(a.jdUsed.slice(0, 90)) : 'No target JD supplied — a generic IT benchmark was applied. Paste the job description for exact keyword alignment.'}</div>
         </div>
       </div>
       <div class="re-bars">
@@ -1062,11 +1062,11 @@ function renderResumeAudit(data) {
             <div class="re-bar-hint">${hint}</div>
           </div>`).join('')}
       </div>
-      ${a.potentialScore != null ? `<div class="re-potential">🔥 Improvement potential: ~${a.potentialScore}/100 agar top deductions fix karein</div>` : ''}
+      ${a.potentialScore != null ? `<div class="re-potential">Improvement potential: ~${a.potentialScore}/100 if the top deductions are fixed</div>` : ''}
     </div>
 
     <div class="re-card">
-      <div class="re-card-title">🔍 Har mark ka hisaab — criteria-by-criteria</div>
+      <div class="re-card-title">Criteria Analysis — How Each Mark Is Earned</div>
       <div class="re-crit-groups">
         ${critGroups.map((g) => `
         <div class="re-crit-group">
@@ -1080,7 +1080,7 @@ function renderResumeAudit(data) {
               </div>
               <div class="re-crit-track"><div class="re-crit-fill ${c.status === 'pass' ? 'pass' : c.status === 'warn' ? 'warn' : 'fail'}" style="width:${Math.max(2, Math.round((c.score / c.max) * 100))}%"></div></div>
               <div class="re-crit-why">${escHtml(c.why || '')}</div>
-              ${c.advice ? `<div class="re-crit-advice">💡 ${escHtml(c.advice)}</div>` : ''}
+              ${c.advice ? `<div class="re-crit-advice">${escHtml(c.advice)}</div>` : ''}
             </div>`).join('')}
         </div>`).join('')}
       </div>
@@ -1088,24 +1088,24 @@ function renderResumeAudit(data) {
 
     ${(a.topDeductions || []).length ? `
     <div class="re-card">
-      <div class="re-card-title">🔻 Top Deductions — sabse zyada score girane wale</div>
+      <div class="re-card-title">Top Deductions — What Hurts the Score Most</div>
       ${a.topDeductions.map((d) => `
         <div class="re-deduct">
           <div class="re-deduct-head"><span class="re-deduct-key">${escHtml(String(d.key || '').split('.').pop())}</span><span class="re-deduct-label">${escHtml(d.label || '')}</span></div>
-          <div class="re-crit-advice">💡 ${escHtml(d.advice || '')}</div>
+          <div class="re-crit-advice">${escHtml(d.advice || '')}</div>
         </div>`).join('')}
     </div>` : ''}
 
     <div class="re-card">
       <p class="re-summary">${mdToHtml(a.executiveSummary || '')}</p>
-      ${a.contentQuality ? `<p class="re-cq"><span class="re-cq-label">📝 Content ka substance (worth it hai kya):</span> ${escHtml(a.contentQuality)}</p>` : ''}
+      ${a.contentQuality ? `<p class="re-cq"><span class="re-cq-label">Content Quality — is what is written worth keeping:</span> ${escHtml(a.contentQuality)}</p>` : ''}
       <div class="re-cols">
         <div class="re-col">
-          <div class="re-col-title">✅ Strengths</div>
+          <div class="re-col-title">Strengths</div>
           <ul>${(a.strengths || []).map((s) => `<li>${escHtml(s)}</li>`).join('') || '<li class="dim">—</li>'}</ul>
         </div>
         <div class="re-col">
-          <div class="re-col-title bad">⚠️ Critical Negatives</div>
+          <div class="re-col-title bad">Critical Negatives</div>
           <ul>${(a.criticalNegatives || []).map((s) => `<li>${escHtml(s)}</li>`).join('') || '<li class="dim">—</li>'}</ul>
         </div>
       </div>
@@ -1113,20 +1113,20 @@ function renderResumeAudit(data) {
 
     ${sections.length ? `
     <div class="re-card">
-      <div class="re-card-title">📚 Section-by-section review</div>
+      <div class="re-card-title">Section-by-Section Review</div>
       <div class="re-sec-grid">
         ${sections.map((s) => `
         <div class="re-sec re-sec-${s.verdict || 'ok'}">
-          <div class="re-sec-head"><span class="re-sec-name">${escHtml(s.section || 'Section')}</span><span class="re-sec-v">${s.verdict === 'strong' ? '✅ strong' : s.verdict === 'weak' ? '❌ weak' : '🔸 ok'}</span></div>
-          ${(s.whatWorks || []).length ? `<div class="re-sec-works">${s.whatWorks.map((w) => `<div>✓ ${escHtml(w)}</div>`).join('')}</div>` : ''}
-          ${(s.whatToImprove || []).length ? `<div class="re-sec-fix">${s.whatToImprove.map((w) => `<div>🛠 ${escHtml(w)}</div>`).join('')}</div>` : ''}
+          <div class="re-sec-head"><span class="re-sec-name">${escHtml(s.section || 'Section')}</span><span class="re-sec-v">${s.verdict === 'strong' ? 'Strong' : s.verdict === 'weak' ? 'Weak' : 'OK'}</span></div>
+          ${(s.whatWorks || []).length ? `<div class="re-sec-works">${s.whatWorks.map((w) => `<div>${escHtml(w)}</div>`).join('')}</div>` : ''}
+          ${(s.whatToImprove || []).length ? `<div class="re-sec-fix">${s.whatToImprove.map((w) => `<div>${escHtml(w)}</div>`).join('')}</div>` : ''}
         </div>`).join('')}
       </div>
     </div>` : ''}
 
     ${links.length ? `
     <div class="re-card">
-      <div class="re-card-title">🔗 Link status (real check)</div>
+      <div class="re-card-title">Link Status (Live Check)</div>
       <div class="re-links">
         ${links.map((l) => `
         <div class="re-link">
@@ -1138,16 +1138,16 @@ function renderResumeAudit(data) {
 
     <div class="re-card">
       <div class="re-kw">
-        <div class="re-col-title">🔑 ATS Keywords Found (${(a.atsKeywordsFound || []).length})</div>
-        <div class="re-chips">${(a.atsKeywordsFound || []).slice(0, 25).map((k) => `<span class="chip chip-ok">${escHtml(k)}</span>`).join('') || '<span class="dim">text me koi common keyword nahi mila</span>'}</div>
-        <div class="re-col-title">🧩 Missing / Recommended</div>
-        <div class="re-chips">${(a.missingRecommendedKeywords || []).slice(0, 25).map((k) => `<span class="chip chip-warn">${escHtml(k)}</span>`).join('') || '<span class="dim">generic skills already hain</span>'}</div>
+        <div class="re-col-title">ATS Keywords Found (${(a.atsKeywordsFound || []).length})</div>
+        <div class="re-chips">${(a.atsKeywordsFound || []).slice(0, 25).map((k) => `<span class="chip chip-ok">${escHtml(k)}</span>`).join('') || '<span class="dim">no common keywords found in the text</span>'}</div>
+        <div class="re-col-title">Missing / Recommended</div>
+        <div class="re-chips">${(a.missingRecommendedKeywords || []).slice(0, 25).map((k) => `<span class="chip chip-warn">${escHtml(k)}</span>`).join('') || '<span class="dim">no gaps — skills align reasonably</span>'}</div>
       </div>
     </div>
 
     ${(a.bulletImprovements || []).length ? `
     <div class="re-card">
-      <div class="re-col-title">✍️ Bullet Rewrites</div>
+      <div class="re-col-title">Bullet Rewrites</div>
       ${a.bulletImprovements.slice(0, 4).map((bi) => `
         <div class="re-rw">
           <div class="re-rw-orig">${escHtml(bi.original || '')}</div>
@@ -1157,7 +1157,7 @@ function renderResumeAudit(data) {
     </div>` : ''}
 
     <div class="re-card">
-      <div class="re-col-title">🎯 Action Plan</div>
+      <div class="re-col-title">Action Plan</div>
       <ol class="re-plan">${(a.actionPlan || []).slice(0, 4).map((s) => `<li>${escHtml(s)}</li>`).join('') || ''}</ol>
     </div>`;
   res.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -1170,7 +1170,7 @@ async function resumeAuditPdf() {
   try {
     await downloadFile('/api/resume/audit-pdf', { audit: _lastAudit, fileName: _lastResumeName }, base + '_ATS_Report.pdf');
   } catch (err) {
-    alert('PDF download fail: ' + err.message);
+    alert('PDF download failed: ' + err.message);
   } finally {
     unlockOp('resume-pdf', $('resume-report-pdf-btn'));
   }

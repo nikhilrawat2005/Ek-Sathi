@@ -220,92 +220,92 @@ function buildCriteriaGroups({ text, bullets, sections, jd, heuristics, pageCoun
   const roleLines = bullets.filter((b) => /(engineer|developer|intern|analyst|scientist|architect|lead|head|manager|consultant|designer|trainee)/i.test(b)).length;
 
   const impact = [
-    crit('impact.quantified', 'Metrics wali bullets (numbers/%)', clamp(100 * (0.08 + 1.5 * metricFrac)), 34,
-      metricFrac >= 0.5 ? `Mazboot: ${quantified}/${bullets.length} bullets me real numbers/% hain (${Math.round(metricFrac * 100)}%).` : (quantified ? `Sirf ${Math.round(metricFrac * 100)}% bullets me metrics hain — baaki plain statements hain.` : 'Koi bullet bhi number/% ke saath nahi — recruiter ko proof chahiye.'),
-      '"Improved load time by 45%", "Handled 1k+ users", "Cut cost from ₹X to ₹Y" — har impact-line me number do.'),
-    crit('impact.specificity', 'Concrete tech/domain keywords wali bullets', clamp(100 * specFrac * 1.2), 33,
-      specFrac > 0.4 ? `${Math.round(specFrac * 100)}% bullets me concrete tech/product ki baat hai.` : `Bahut kam bullets (${Math.round(specFrac * 100)}%) me concrete cheez mention hai — generic lagta hai.`,
-      'React, AWS, dashboard, API jaise exact nouns use karo, sirf "worked with tools" nahi.'),
-    crit('impact.fillers', 'Filler phrases (responsible for / helped...)', clamp(100 - 110 * fillerFrac), 33,
-      filler.length ? `${filler.length} bullet(s) weak filler phrase se bhari hain — substance sirf wahi likha hai jo "kiya".` : 'Koi boring filler nahi mila.',
-      'Filler hatao aur batao: kitna bada scope, kaun sa result — concrete rakho.'),
+    crit('impact.quantified', 'Bullets with metrics (numbers/%)', clamp(100 * (0.08 + 1.5 * metricFrac)), 34,
+      metricFrac >= 0.5 ? `Strong: ${quantified}/${bullets.length} bullets contain real numbers/percentages (${Math.round(metricFrac * 100)}%).` : (quantified ? `Only ${Math.round(metricFrac * 100)}% of bullets contain metrics — the rest are plain statements.` : 'No bullet contains a number or percentage — recruiters need visible proof of impact.'),
+      '"Improved load time by 45%", "Handled 1k+ users", "Cut cost from ₹X to ₹Y" — add a number to every impact line.'),
+    crit('impact.specificity', 'Concrete tech/domain keywords in bullets', clamp(100 * specFrac * 1.2), 33,
+      specFrac > 0.4 ? `${Math.round(specFrac * 100)}% of bullets mention concrete technology or products.` : `Too few bullets (${Math.round(specFrac * 100)}%) name something specific — the profile reads generic.`,
+      'Use exact nouns such as React, AWS, dashboard or specific APIs — not just "worked with tools".'),
+    crit('impact.fillers', 'No filler phrases (responsible for / helped...)', clamp(100 - 110 * fillerFrac), 33,
+      filler.length ? `${filler.length} bullet(s) rely on weak filler phrasing — substance beyond "what was done" is missing.` : 'No boring filler phrases found.',
+      'Cut the filler and state the scope plus the result — stay concrete.'),
   ];
 
   const action = [
-    crit('action.strongLead', 'Strong action verb se shuru bullets', Math.min(60, Math.round(100 * strongFrac / 0.8)), 60,
-      strongFrac >= 0.7 ? `${Math.round(strongFrac * 100)}% bullets strong verb se shuru — outstanding.` : (strongFrac > 0 ? `Sirf ${Math.round(strongFrac * 100)}% bullets strong verb se shuru hoti hain.` : 'Koi bullet strong verb se shuru nahi hoti (naam/\"I\"/pronoun se jaati hain).'),
-      'Har bullet: Built, Designed, Automated, Optimized, Launched, Led se shuru karo.'),
-    crit('action.weakLead', 'Weak opening verbs avoid (Contributed to...)', clamp(100 - 130 * weakFrac), 25,
-      weakFrac > 0.2 ? `${Math.round(weakFrac * 100)}% bullets weak verb se shuru — impact dab raha hai.` : (weakLead ? `${weakLead} bullet(s) weak verb se shuru.` : 'Koi weak opening verb nahi.'),
-      '"Worked on X" ki jagah "Shipped/Built X" — wohi kaam double impact.'),
-    crit('action.verbMix', 'Strong vs weak ka ratio', (strongLead || weakLead) ? clamp(100 * (strongLead / (strongLead + weakLead))) : 25, 15,
-      (strongLead || weakLead) ? `Strong:weak = ${strongLead}:${weakLead}.` : 'Action verbs hi nahi mile.',
-      'Strong verbs ≥ 80% tak le aao; weak verbs zero karo.'),
+crit('action.strongLead', 'Bullets start with a strong action verb', Math.min(60, Math.round(100 * strongFrac / 0.8)), 60,
+      strongFrac >= 0.7 ? `${Math.round(strongFrac * 100)}% of bullets start with strong verbs — outstanding.` : (strongFrac > 0 ? `Only ${Math.round(strongFrac * 100)}% of bullets start with a strong verb.` : 'No bullet starts with a strong verb (they begin with a noun, "I" or a pronoun).'),
+      'Start every bullet with Built, Designed, Automated, Optimized, Launched, Led...'),
+    crit('action.weakLead', 'Weak opening verbs avoided (Contributed to...)', clamp(100 - 130 * weakFrac), 25,
+      weakFrac > 0.2 ? `${Math.round(weakFrac * 100)}% of bullets start with weak verbs — impact is being dampened.` : (weakLead ? `${weakLead} bullet(s) start with weak verbs.` : 'No weak opening verbs found.'),
+      'Replace "Worked on X" with "Shipped/Built X" — the same work reads twice as strong.'),
+    crit('action.verbMix', 'Strong : weak verb ratio', (strongLead || weakLead) ? clamp(100 * (strongLead / (strongLead + weakLead))) : 25, 15,
+      (strongLead || weakLead) ? `Strong:weak = ${strongLead}:${weakLead}.` : 'No action verbs detected at all.',
+      'Raise strong verbs to ≥ 80% of bullets; take weak verbs to zero.'),
   ];
 
   const format = [
     crit('format.sections', 'Standard ATS sections found', secCount >= 5 ? 15 : secCount === 4 ? 12 : secCount === 3 ? 8 : secCount === 2 ? 5 : 0, 15,
-      secCount > 0 ? `${secCount} standard sections mili. Missing: ${heuristics.missingSections.length ? heuristics.missingSections.join(', ') : '—'}.` : 'Koi standard section header nahi mila.',
-      'SKILLS, EXPERIENCE, PROJECTS, EDUCATION, SUMMARY sab standard headers me likho.'),
+      secCount > 0 ? `${secCount} standard sections found. Missing: ${heuristics.missingSections.length ? heuristics.missingSections.join(', ') : '—'}.` : 'No standard section headers found.',
+      'Use standard headers: SKILLS, EXPERIENCE, PROJECTS, EDUCATION, SUMMARY.'),
     crit('format.email', 'Contact email present', hasEmail(text) ? 12 : 0, 12,
-      hasEmail(text) ? 'Email mila.' : 'Email nahi mila!',
-      'Top me clear email daalo.'),
+      hasEmail(text) ? 'Email found.' : 'Email NOT found!',
+      'Place a clear email at the top.'),
     crit('format.phone', 'Phone number present', hasPhone(text) ? 10 : 0, 10,
-      hasPhone(text) ? 'Phone mila.' : 'Phone nahi mila.',
-      '+91-XXXXXXXXXX format me daalo.'),
+      hasPhone(text) ? 'Phone found.' : 'Phone NOT found.',
+      'Use the format +91-XXXXXXXXXX.'),
     crit('format.location', 'Location/city present', hasLocation(text) ? 6 : 0, 6,
-      hasLocation(text) ? 'Location hai.' : 'Location nahi dikhi.',
-      'City, Country add karo (ATS location filter).'),
+      hasLocation(text) ? 'Location present.' : 'Location not visible.',
+      'Add City, Country (ATS location filter).'),
     crit('format.links', 'Social/profile links (GitHub/LinkedIn)', hosts.github || hosts.linkedin ? 12 : (hosts.portfolio ? 7 : 0), 12,
-      (hosts.github || hosts.linkedin) ? 'GitHub/LinkedIn link mila — professional.' : (hosts.portfolio ? 'Sirf portfolio link mila — GitHub/LinkedIn bhi chahiye.' : 'Koi GitHub/LinkedIn link nahi mila.'),
-      'LinkedIn + GitHub working links add karo (niche status check bhi hota hai).'),
-    crit('format.periods', 'Bullets me trailing "." nahi', clamp(12 - 11 * trailFrac), 12,
-      trailFrac > 0.2 ? `${Math.round(trailFrac * 100)}% bullets \".\" se khatam — outdated/ATS-dikkat.` : 'Bullet endings ATS-friendly hain.',
-      'Bullet ke end me sentence-dot nahi; abbreviations ke dot okay.'),
-    crit('format.headers', 'Section headers ki casing consistent', headOk ? 10 : 4, 10,
-      headOk ? 'Headers consistent uppercase/title-case me hain.' : 'Headers ki casing mixed hai (title/ALL-CAPS/lowercase) — parse issue.',
-      'Har header same style: SKILLS, EXPERIENCE,...'),
-    crit('format.places', 'Placeholder/junk text nahi', clamp(10 - 4 * places), 10,
-      places ? `${places} placeholder term(s) mile (${PLACEHOLDER_TERMS.slice(0, 3).join(', ')}...).` : 'Koi placeholder junk nahi mila.',
-      'XXX/TODO/lorem ipsum waghera hatao — draft resume serious nahi lagta.'),
+      (hosts.github || hosts.linkedin) ? 'GitHub/LinkedIn link found — professional.' : (hosts.portfolio ? 'Only a portfolio link found — GitHub/LinkedIn also needed.' : 'No GitHub/LinkedIn link found.'),
+      'Add working LinkedIn + GitHub links (their status is verified below).'),
+    crit('format.periods', 'No trailing "." on bullets', clamp(12 - 11 * trailFrac), 12,
+      trailFrac > 0.2 ? `${Math.round(trailFrac * 100)}% of bullets end with "." — outdated/ATS-hostile.` : 'Bullet endings are ATS-friendly.',
+      'Do not end bullets with a sentence period (dots in abbreviations are fine).'),
+    crit('format.headers', 'Consistent casing of section headers', headOk ? 10 : 4, 10,
+      headOk ? 'Headers use consistent uppercase/title-case.' : 'Headers mix title/ALL-CAPS/lowercase — parsing risk.',
+      'Use one style for every header: SKILLS, EXPERIENCE, ...'),
+    crit('format.places', 'No placeholder/junk text', clamp(10 - 4 * places), 10,
+      places ? `${places} placeholder term(s) found (${PLACEHOLDER_TERMS.slice(0, 3).join(', ')}...).` : 'No placeholder junk found.',
+      'Remove XXX/TODO/lorem ipsum — a draft resume does not look serious.'),
   ];
   if (pageCount != null) {
     format.push(crit('format.pages', 'Single page / compact', pageCount <= 1 ? 15 : pageCount === 2 ? 10 : pageCount === 3 ? 5 : 2, 15,
-      pageCount <= 1 ? `Resume ${pageCount} page ka hai — 1-pager ideal.` : `Resume ${pageCount} pages ka hai.`,
-      years < 4 && pageCount > 1 ? 'Freshers ke liye 1 page best; irrelevant cheezein hatao.' : '1-2 pages limit; redundant lines cut karo.'));
+      pageCount <= 1 ? `Resume is ${pageCount} page — one page is ideal for this profile.` : `Resume is ${pageCount} pages.`,
+      years < 4 && pageCount > 1 ? 'For early-career profiles 1 page is best; cut irrelevant content.' : 'Stay within 1-2 pages; trim redundant lines.'));
   }
 
   const experience = [
     crit('exp.present', 'Experience section present', hasExp ? 20 : 0, 20,
-      hasExp ? 'Experience section mili.' : 'Experience section nahi mili (internships/projects se cover karo).',
-      'Experience me Role → Company → Duration pattern.'),
+      hasExp ? 'Experience section found.' : 'Experience section NOT found (cover with internships/projects).',
+      'Follow Role → Company → Duration under every entry.'),
     crit('exp.roles', 'Role/title lines detected', roleLines >= 2 ? 20 : roleLines === 1 ? 12 : 4, 20,
-      roleLines >= 2 ? `${roleLines} role-like lines mili.` : 'Role/title clearly nahi dikh rahe.',
-      'Har entry bold role + company: "SDE Intern — Acme Corp".'),
+      roleLines >= 2 ? `${roleLines} role-like lines detected.` : 'Role/title not clearly visible.',
+      'Bold role + company for every entry: "SDE Intern — Acme Corp".'),
     crit('exp.dates', 'Date ranges present', dateCount >= 3 ? 20 : dateCount === 2 ? 16 : dateCount === 1 ? 9 : 3, 20,
-      dateCount >= 3 ? `${dateCount} dates mili.` : `Sirf ${dateCount} date(s) mili.`,
-      'Har role ke saath "Jun 2021 – Aug 2024" (ATS tenure count karta hai).'),
+      dateCount >= 3 ? `${dateCount} dates found.` : `Only ${dateCount} date(s) found.`,
+      'Add "Jun 2021 – Aug 2024" to every role (ATS counts tenure from dates).'),
     crit('exp.tenure', 'Work tenure (years) visible', years >= 4 ? 18 : years >= 2 ? 16 : years >= 1 ? 12 : years > 0 ? 6 : 8, 20,
-      years > 0 ? `~${years} saal ka tenure approx.` : 'Tenure estimate nahi hua.',
-      years < 2 ? 'Har role ki exact dates daalo — short tenures bhi with reasons.' : 'Tenure clear rakho.'),
-    crit('exp.quantified', 'Experience me metric bullets', clamp(20 * metricFrac * 1.25), 20,
-      metricFrac >= 0.6 ? 'Experience me achieved-results dikhte hain.' : 'Experience me achievements number ke bina — impact weak.',
-      'Har role me 2-3 achieved-metrics bullets ("reduced downtime 40%").'),
+      years > 0 ? `~${years} years of tenure estimated.` : 'Tenure could not be estimated.',
+      years < 2 ? 'Add exact dates per role — explain short tenures too.' : 'Keep tenure clearly visible.'),
+    crit('exp.quantified', 'Metric-rich bullets in experience', clamp(20 * metricFrac * 1.25), 20,
+      metricFrac >= 0.6 ? 'Experience shows achieved results.' : 'Experience achievements have no numbers — weak impact.',
+      'Add 2-3 achieved-result bullets per role ("reduced downtime 40%").'),
   ];
 
   const skills = [
     crit('skills.present', 'Skills section present', hasSkills ? 18 : 0, 18,
-      hasSkills ? 'Skills section mili.' : 'Skills section nahi mili.',
-      'SKILLS section apni category-wise rakho.'),
+      hasSkills ? 'Skills section found.' : 'Skills section NOT found.',
+      'Keep a category-wise SKILLS section.'),
     crit('skills.count', 'Enough distinct tech skills (5+)', matched.length >= 6 ? 14 : matched.length >= 3 ? 9 : matched.length >= 1 ? 4 : 0, 14,
-      matched.length >= 6 ? `${matched.length} tech terms detected.` : `Sirf ${matched.length} tech term mila.`,
-      '5-15 relevant skills (Languages/Frameworks/Tools/Databases).'),
+      matched.length >= 6 ? `${matched.length} tech terms detected.` : `Only ${matched.length} tech term(s) detected.`,
+      'List 5-15 relevant skills (Languages/Frameworks/Tools/Databases).'),
     crit('skills.cat', 'Skills categorized (languages:)', catOk ? 12 : 0, 12,
-      catOk ? 'Category labels mile (Languages:/Frameworks:...).' : 'Skills plain list me hain — categories nahi.',
-      '"Languages: JavaScript, TypeScript | Frameworks: React, Node" format use karo.'),
-    crit('skills.alignment', `${kwSource === 'jd' ? 'JD' : 'Role'} keywords ka overlap`, Math.round(56 * (1 - Math.exp(-kwFrac * 3.5))), 56,
-      kwSource === 'jd' ? `${matched.length}/${dict.length} JD-keywords mile. Missing: ${dict.slice(0, 8).filter((w) => !matched.includes(w)).join(', ') || '—'}.` : `${matched.length}/${dict.length} standard IT keywords mile — target JD paste karo to exact alignment dikhe.`,
-      kwSource === 'jd' ? 'JD ke exact buzzwords (skills+tools+jargon) ki spellings use karo.' : 'Target JD do taaki real keyword-match bane.'),
+      catOk ? 'Category labels found (Languages:/Frameworks:...).' : 'Skills are a plain list — no categories.',
+      'Use "Languages: JavaScript, TypeScript | Frameworks: React, Node".'),
+    crit('skills.alignment', `${kwSource === 'jd' ? 'JD' : 'Role'} keyword overlap`, Math.round(56 * (1 - Math.exp(-kwFrac * 3.5))), 56,
+      kwSource === 'jd' ? `${matched.length}/${dict.length} JD keywords matched. Missing: ${dict.slice(0, 8).filter((w) => !matched.includes(w)).join(', ') || '—'}.` : `${matched.length}/${dict.length} standard IT keywords matched — paste a target JD for exact alignment.`,
+      kwSource === 'jd' ? 'Use the exact JD buzzwords (skills + tools + jargon) with correct spellings.' : 'Provide a target JD so a real keyword match can be computed.'),
   ];
 
   return { impact, action, format, experience, skills };
@@ -329,25 +329,25 @@ function topDeductions(criteria) {
 function fallbackCritique({ atsScore, verdict, breakdown, heuristics, bullets, criteria }) {
   const strengths = [];
   const negatives = [];
-  if (heuristics.strongVerbs > 3) strengths.push('Kai bullets strong action verbs se shuru — good.');
-  if (heuristics.quantifiedBullets >= 3) strengths.push('Real numbers present — impact dikh raha hai.');
-  if (heuristics.hasEmail && heuristics.hasPhone) strengths.push('Contact info complete hai.');
-  if (heuristics.sectionsDetected.length >= 4) strengths.push('Standard ATS sections present hain.');
-  if (heuristics.metricFrac >= 40) strengths.push(`${heuristics.metricFrac}% bullets me metrics hain — data-backed.`);
+  if (heuristics.strongVerbs > 3) strengths.push('Most bullets start with strong action verbs — good.');
+  if (heuristics.quantifiedBullets >= 3) strengths.push('Real numbers are present — impact is visible.');
+  if (heuristics.hasEmail && heuristics.hasPhone) strengths.push('Contact information is complete.');
+  if (heuristics.sectionsDetected.length >= 4) strengths.push('Standard ATS sections are present.');
+  if (heuristics.metricFrac >= 40) strengths.push(`${heuristics.metricFrac}% of bullets carry metrics — data-backed.`);
 
-  if (heuristics.quantifiedBullets < 3) negatives.push(`Sirf ${heuristics.quantifiedBullets} bullets me metrics — results quantify karo.`);
-  if (heuristics.weakVerbs > 2) negatives.push(`Weak opening verbs (${heuristics.weakVerbs}) impact kam kar rahe hain.`);
-  if (!heuristics.hasEmail) negatives.push('Email missing.');
-  if (!heuristics.hasPhone) negatives.push('Phone missing.');
+  if (heuristics.quantifiedBullets < 3) negatives.push(`Only ${heuristics.quantifiedBullets} bullets contain metrics — quantify your results.`);
+  if (heuristics.weakVerbs > 2) negatives.push(`Weak opening verbs (${heuristics.weakVerbs}) lower the impact.`);
+  if (!heuristics.hasEmail) negatives.push('Email is missing.');
+  if (!heuristics.hasPhone) negatives.push('Phone number is missing.');
   if (heuristics.missingSections && heuristics.missingSections.length) negatives.push(`Missing sections: ${heuristics.missingSections.join(', ')}.`);
-  if (!(heuristics.social && (heuristics.social.github || heuristics.social.linkedin))) negatives.push('GitHub/LinkedIn link nahi mila.');
-  if (heuristics.trailingPeriods > 0) negatives.push('Bullets "." se khatam ho rahi hain.');
+  if (!(heuristics.social && (heuristics.social.github || heuristics.social.linkedin))) negatives.push('No GitHub/LinkedIn link found.');
+  if (heuristics.trailingPeriods > 0) negatives.push('Bullets end with "." — fix the formatting.');
 
   const sec = (heuristics.sectionsDetected || []).map((s) => ({
     section: s,
     verdict: s === 'Experience' ? (heuristics.quantifiedBullets >= 3 ? 'ok' : 'weak') : heuristics.metricFrac >= 40 ? 'ok' : 'ok',
-    whatWorks: [s + ' section exist karti hai.'],
-    whatToImprove: s === 'Experience' ? ['Har role ke liye 2-3 quantified result bullets.'] : ['Content ko aur result-oriented/specific banao.'],
+    whatWorks: [s + ' section is present.'],
+    whatToImprove: s === 'Experience' ? ['Add 2-3 quantified result bullets per role.'] : ['Make the content more result-oriented and specific.'],
   }));
   const weakest = Object.entries(breakdown).reduce((a, b) => (b[1] < a[1] ? b : a))[0];
 
@@ -355,18 +355,18 @@ function fallbackCritique({ atsScore, verdict, breakdown, heuristics, bullets, c
   const potential = Math.min(100, Math.round(atsScore + deductions.reduce((s, d) => s + (100 - atsScore) * 0.12, 0)));
 
   return {
-    executiveSummary: `ATS score ${atsScore}/100 (${verdict}). Sabse kamzor dimension: ${weakest}. Score ko rokenewale top-3: ${deductions.map((d) => d.label).join(', ') || '—'}.`,
-    contentQuality: 'AI critique timeout ke baad deterministic analysis diya — numbers/verbs/filler/tenure checks based. Exact content-review ke liye dobara run karo.',
-    strengths: strengths.length ? strengths : ['Resume submit hua — ab improvements par focus karo.'],
-    criticalNegatives: negatives.length ? negatives : ['Koi critical negative nahi mila.'],
+    executiveSummary: `ATS score ${atsScore}/100 (${verdict}). Weakest dimension: ${weakest}. Top-3 deductions: ${deductions.map((d) => d.label).join(', ') || '—'}.`,
+    contentQuality: 'AI critique timed out, so this is a deterministic analysis — based on numbers, verbs, filler and tenure checks. Re-run to get a full AI content review.',
+    strengths: strengths.length ? strengths : ['The resume was submitted — focus on the improvements listed below.'],
+    criticalNegatives: negatives.length ? negatives : ['No critical negatives detected.'],
     atsKeywordsFound: (heuristics.skillMatch ? heuristics.skillMatch.matched : []).slice(0, 12),
     missingRecommendedKeywords: (heuristics.skillMatch && heuristics.skillMatch.source === 'jd' && heuristics.skillMatch.matched.length < heuristics.skillMatch.total) ? (heuristics.skillMatch.matched.length ? (heuristics.skillMatch.dictMissing || []) : []) : [],
     bulletImprovements: [],
     actionPlan: [
-      `Sabse weak dimension fix karo: ${weakest}.`,
-      heuristics.quantifiedBullets < 3 ? 'Har impact bullet me number add karo.' : 'Metrics wali depth aur badhao.',
-      !heuristics.hasEmail ? 'Email + phone + location top me add karo.' : 'Contact section verify karo.',
-      '1 page / consistent formatting + standard section headers.',
+      `Fix the weakest dimension first: ${weakest}.`,
+      heuristics.quantifiedBullets < 3 ? 'Add a number to every impact bullet.' : 'Push for deeper metric coverage.',
+      !heuristics.hasEmail ? 'Add email + phone + location at the top.' : 'Verify the contact section.',
+      'Keep it to one page with consistent formatting and standard section headers.',
     ],
     sectionReview: sec,
     grades: {
@@ -591,7 +591,7 @@ function buildAuditReportPdf(audit, resumeName = 'resume') {
     }
     if (audit.potentialScore != null) {
       ensure(14);
-      doc.font('Helvetica-Bold').fontSize(9).fillColor('#4f46e5').text(`Improvement potential: ~${audit.potentialScore}/100 (top-${(audit.topDeductions || []).length} deductions fix karne par)`, 44, y, { width: W });
+      doc.font('Helvetica-Bold').fontSize(9).fillColor('#4f46e5').text(`Improvement potential: ~${audit.potentialScore}/100 if the top-${(audit.topDeductions || []).length} deductions are fixed`, 44, y, { width: W });
       y += 14;
     }
     y += 4;
@@ -608,7 +608,7 @@ function buildAuditReportPdf(audit, resumeName = 'resume') {
 
     if (audit.topDeductions && audit.topDeductions.length) {
       ensure(14);
-      doc.font('Helvetica-Bold').fontSize(10).fillColor('#b45309').text('Top Deductions — kya result cheer raha hai', 44, y, { width: W });
+      doc.font('Helvetica-Bold').fontSize(10).fillColor('#b45309').text('Top Deductions — What Hurts the Score Most', 44, y, { width: W });
       y += 14;
       ensure(14);
       doc.font('Helvetica').fontSize(8.5).fillColor('#92400e').text(audit.topDeductions.map((d, i) => `${i + 1}. ${d.label}: ${d.advice}`).join('\n'), 44, y, { width: W, lineGap: 3 });
