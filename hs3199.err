@@ -1,0 +1,2 @@
+[llmService] EKSATHI Key ...8200 moved to Queue B (cooldown 60s): This request requires more credits, or fewer max_tokens. You requested up to 3000 tokens, but can only afford 2936. To increase, visit https://openrouter.ai/settings/credits and upgrade to a paid account
+[llmService] Retrying with next key from Queue A: KEY3

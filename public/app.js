@@ -111,7 +111,32 @@ function resetChatUI() {
     <div id="welcome-screen" class="welcome-screen">
       <div class="welcome-orb"><svg class="ic"><use href="#i-spark" /></svg></div>
       <h1 class="welcome-title">Hi, I'm Ek Sathi</h1>
-      <p class="welcome-sub">Your AI Companion for Learning & Growth</p>
+      <p class="welcome-sub">Your AI Companion for Learning &amp; Growth</p>
+
+      <div class="welcome-product-row">
+        <button class="welcome-product-card" data-view-nav="hackathon">
+          <svg class="ic welcome-product-icon"><use href="#i-trophy" /></svg>
+          <div class="welcome-product-info">
+            <div class="welcome-product-name">Hackathon Lab</div>
+            <div class="welcome-product-desc">Live hackathons &amp; internships, scraped daily</div>
+          </div>
+        </button>
+        <button class="welcome-product-card" data-view-nav="resume">
+          <svg class="ic welcome-product-icon"><use href="#i-file" /></svg>
+          <div class="welcome-product-info">
+            <div class="welcome-product-name">Resume Audit</div>
+            <div class="welcome-product-desc">ATS score, full breakdown &amp; AI critique</div>
+          </div>
+        </button>
+        <button class="welcome-product-card" data-view-nav="study">
+          <svg class="ic welcome-product-icon"><use href="#i-book" /></svg>
+          <div class="welcome-product-info">
+            <div class="welcome-product-name">Study</div>
+            <div class="welcome-product-desc">Analyze any GitHub repo or website with AI</div>
+          </div>
+        </button>
+      </div>
+
       <div class="welcome-suggestions">
         <button class="welcome-chip">Explain a coding concept</button>
         <button class="welcome-chip">Help me debug this code</button>
@@ -121,7 +146,12 @@ function resetChatUI() {
     </div>`;
   $('messages-container').innerHTML = welcome;
   bindWelcomeChips();
+  // Bind product card nav buttons
+  document.querySelectorAll('.welcome-product-card[data-view-nav]').forEach((btn) => {
+    btn.addEventListener('click', () => showView(btn.dataset.viewNav));
+  });
 }
+
 
 /* ── Chat: message rendering ───────────────────────────── */
 function scrollToBottom(container = $('messages-container')) {

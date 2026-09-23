@@ -49,7 +49,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal server error' });
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 4646;
 
 // Vercel imports this file as a serverless function (module.exports = app),
 // but app.listen also lets it run standalone locally with `npm run dev`.
