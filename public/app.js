@@ -1551,15 +1551,18 @@ async function loadOpportunities(forceType) {
   if (!grid) return;
   grid.innerHTML = '<div class="study-placeholder">Loading opportunities…</div>';
   try {
-    const url = `${FASTAPI}/api/opportunities${type !== 'all' ? `?type=${type}` : ''}`;
-    const res = await fetch(url);
+    let res;
+    try {
+      res = await fetch(`/api/opportunities${type !== 'all' ? `?type=${type}` : ''}`);
+    } catch (_) {
+      res = await fetch(`${FASTAPI}/api/opportunities${type !== 'all' ? `?type=${type}` : ''}`);
+    }
     const data = await res.json();
     _oppData = data.opportunities || [];
     renderOppGrid(_oppData);
   } catch (err) {
     grid.innerHTML = `<div class="study-placeholder" style="color:var(--danger)">
-      Could not reach FastAPI backend (port 8000). Run: <code>cd backend && uvicorn main:app --port 8000 --reload</code>
-      <br><br>${escHtml(err.message)}
+      Could not load opportunities.<br>${escHtml(err.message)}
     </div>`;
   }
 }
@@ -1620,12 +1623,17 @@ async function loadNews(forcecat) {
   if (!grid) return;
   grid.innerHTML = '<div class="study-placeholder">Fetching latest news…</div>';
   try {
-    const res = await fetch(`${FASTAPI}/api/news?category=${cat}&limit=20`);
+    let res;
+    try {
+      res = await fetch(`/api/news?category=${cat}&limit=20`);
+    } catch (_) {
+      res = await fetch(`${FASTAPI}/api/news?category=${cat}&limit=20`);
+    }
     const data = await res.json();
     renderNewsGrid(data.articles || []);
   } catch (err) {
     grid.innerHTML = `<div class="study-placeholder" style="color:var(--danger)">
-      Could not reach FastAPI backend (port 8000).<br>${escHtml(err.message)}
+      Could not load news.<br>${escHtml(err.message)}
     </div>`;
   }
 }

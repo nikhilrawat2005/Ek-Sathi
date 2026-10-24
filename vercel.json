@@ -19,6 +19,11 @@
       "dest": "/src/server.js"
     },
     {
+      "src": "/opp-news.css",
+      "headers": { "Cache-Control": "no-cache, no-store, must-revalidate" },
+      "dest": "/src/server.js"
+    },
+    {
       "src": "/index.html",
       "headers": { "Cache-Control": "no-cache, no-store, must-revalidate" },
       "dest": "/src/server.js"

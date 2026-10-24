@@ -14,7 +14,11 @@ const crypto = require('crypto');
 //   FieldValue.arrayUnion(...)
 // ─────────────────────────────────────────────────────────
 
-const DATA_DIR = path.join(__dirname, '..', '..', 'data');
+// In serverless environments like Vercel, the filesystem is read-only except /tmp
+const IS_VERCEL = !!process.env.VERCEL;
+const DATA_DIR = IS_VERCEL
+  ? path.join('/tmp', 'ek-sathi-data')
+  : path.join(__dirname, '..', '..', 'data');
 const DB_FILE = path.join(DATA_DIR, 'store.json');
 
 function ensureDir() {

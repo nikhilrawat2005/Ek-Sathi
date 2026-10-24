@@ -9,6 +9,8 @@ const filesRoute         = require('./routes/files');
 const hackathonsRoute    = require('./routes/hackathons');
 const studyRoute         = require('./routes/study');
 const resumeRoute        = require('./routes/resume');
+const newsRoute          = require('./routes/news');
+const opportunitiesRoute = require('./routes/opportunities');
 
 const app = express();
 
@@ -37,6 +39,8 @@ app.use('/api/files',         filesRoute);
 app.use('/api/hackathons',    hackathonsRoute);
 app.use('/api/study',         studyRoute);
 app.use('/api/resume',        resumeRoute);
+app.use('/api/news',          newsRoute);
+app.use('/api/opportunities', opportunitiesRoute);
 
 // 404 handler for unknown API routes
 app.use('/api', (req, res) => {
