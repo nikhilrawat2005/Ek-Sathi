@@ -10,6 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/style.css?v=22" />
+  <link rel="stylesheet" href="/opp-news.css?v=1" />
 </head>
 <body>
 
@@ -51,6 +52,8 @@
         <button class="nav-btn" data-view="hackathon"><svg class="ic"><use href="#i-trophy" /></svg><span>Hackathon Lab</span></button>
         <button class="nav-btn" data-view="study"><svg class="ic"><use href="#i-book" /></svg><span>Study</span></button>
         <button class="nav-btn" data-view="resume"><svg class="ic"><use href="#i-file" /></svg><span>Resume Audit</span></button>
+        <button class="nav-btn" data-view="opportunities"><svg class="ic"><use href="#i-search" /></svg><span>Opportunities</span></button>
+        <button class="nav-btn" data-view="news"><svg class="ic"><use href="#i-globe" /></svg><span>Tech News</span></button>
       </nav>
       <div class="sidebar-chats-section">
         <div class="sidebar-section-label flex-between"><span>Chats</span></div>
@@ -220,6 +223,51 @@
           <button class="btn-outline cc-open-btn" id="resume-discuss-btn">Discuss with Ek Sathi</button>
           <button class="btn-outline" id="resume-report-pdf-btn">Download ATS Report</button>
           <button class="btn-outline" id="resume-clear-btn">Clear all</button>
+        </div>
+      </section>
+
+      <!-- ─── OPPORTUNITY FINDER VIEW ─── -->
+      <section class="view" id="view-opportunities">
+        <div class="view-header">
+          <div>
+            <div class="view-title">Opportunity Finder</div>
+            <div class="view-sub">Discover internships, hackathons &amp; opportunities — curated for CSE students.</div>
+          </div>
+        </div>
+        <div class="opp-toolbar" id="opp-toolbar">
+          <button class="btn-small opp-filter active" data-type="all">All</button>
+          <button class="btn-small opp-filter" data-type="internship">Internships</button>
+          <button class="btn-small opp-filter" data-type="hackathon">Hackathons</button>
+          <button class="btn-small" id="opp-refresh-btn" style="margin-left:auto">
+            <svg class="ic"><use href="#i-refresh" /></svg> Refresh
+          </button>
+        </div>
+        <div class="opp-grid" id="opp-grid">
+          <div class="study-placeholder">Loading opportunities…</div>
+        </div>
+      </section>
+
+      <!-- ─── TECH NEWS VIEW ─── -->
+      <section class="view" id="view-news">
+        <div class="view-header">
+          <div>
+            <div class="view-title">Tech News</div>
+            <div class="view-sub">Latest technology updates, AI breakthroughs &amp; developer news — updated every 30 min.</div>
+          </div>
+        </div>
+        <div class="news-toolbar" id="news-toolbar">
+          <button class="btn-small news-cat active" data-cat="tech">Tech</button>
+          <button class="btn-small news-cat" data-cat="ai">AI / ML</button>
+          <button class="btn-small news-cat" data-cat="top">Top</button>
+          <button class="btn-small news-cat" data-cat="india">India</button>
+          <button class="btn-small news-cat" data-cat="world">World</button>
+          <button class="btn-small news-cat" data-cat="business">Business</button>
+          <button class="btn-small" id="news-refresh-btn" style="margin-left:auto">
+            <svg class="ic"><use href="#i-refresh" /></svg> Refresh
+          </button>
+        </div>
+        <div class="news-grid" id="news-grid">
+          <div class="study-placeholder">Loading news…</div>
         </div>
       </section>
 

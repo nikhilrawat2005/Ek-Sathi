@@ -16,3 +16,8 @@ geminikeys.txt
 
 # Local data store (JSON-file Firestore) + uploaded files — local only
 data/
+
+__pycache__/
+*.pyc
+.venv/
+

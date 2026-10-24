@@ -40,6 +40,8 @@ function showView(view) {
   document.querySelectorAll('.view').forEach((v) => v.classList.toggle('active', v.id === `view-${view}`));
   document.querySelectorAll('.nav-btn').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
   if (view === 'hackathon') loadDiscoverCards();
+  if (view === 'opportunities') loadOpportunities();
+  if (view === 'news') loadNews();
 }
 
 /* ── Sessions ──────────────────────────────────────────── */
@@ -1520,6 +1522,8 @@ function init() {
   bindResume();
   bindDiscovery();
   bindWelcomeChips();
+  bindOpportunities();
+  bindNews();
   resetChatUI();
 
   loadSessions();
@@ -1529,3 +1533,130 @@ function init() {
 }
 
 document.addEventListener('DOMContentLoaded', init);
+
+/* ══════════════════════════════════════════════════════════════════════════
+   OPPORTUNITY FINDER  (FastAPI backend: http://localhost:8000)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+const FASTAPI = (typeof window !== 'undefined' && window.location && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1')
+  ? (window.location.origin)
+  : 'http://localhost:8000';
+let _oppType = 'all';
+let _oppData = [];
+
+async function loadOpportunities(forceType) {
+  const type = forceType || _oppType;
+  _oppType = type;
+  const grid = $('opp-grid');
+  if (!grid) return;
+  grid.innerHTML = '<div class="study-placeholder">Loading opportunities…</div>';
+  try {
+    const url = `${FASTAPI}/api/opportunities${type !== 'all' ? `?type=${type}` : ''}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    _oppData = data.opportunities || [];
+    renderOppGrid(_oppData);
+  } catch (err) {
+    grid.innerHTML = `<div class="study-placeholder" style="color:var(--danger)">
+      Could not reach FastAPI backend (port 8000). Run: <code>cd backend && uvicorn main:app --port 8000 --reload</code>
+      <br><br>${escHtml(err.message)}
+    </div>`;
+  }
+}
+
+function renderOppGrid(items) {
+  const grid = $('opp-grid');
+  if (!grid) return;
+  if (!items || !items.length) {
+    grid.innerHTML = '<div class="study-placeholder">No opportunities found.</div>';
+    return;
+  }
+  grid.innerHTML = items.map((o) => {
+    const isIntern = (o.type || '') === 'internship';
+    const badge = isIntern
+      ? '<span class="opp-badge internship">Internship</span>'
+      : '<span class="opp-badge hackathon">Hackathon</span>';
+    const tags = (o.tags || []).slice(0, 4).map((t) => `<span class="opp-tag">${escHtml(t)}</span>`).join('');
+    return `
+      <a class="opp-card" href="${escHtml(o.link)}" target="_blank" rel="noopener">
+        <div class="opp-card-header">
+          ${badge}
+          <span class="opp-source">${escHtml(o.source || '')}</span>
+        </div>
+        <div class="opp-title">${escHtml(o.title)}</div>
+        ${o.description ? `<div class="opp-desc">${escHtml(o.description)}</div>` : ''}
+        <div class="opp-meta">
+          ${o.stipend ? `<span>💰 ${escHtml(o.stipend)}</span>` : ''}
+          ${o.deadline ? `<span>📅 ${escHtml(o.deadline)}</span>` : ''}
+        </div>
+        <div class="opp-tags">${tags}</div>
+        <div class="opp-cta">View →</div>
+      </a>`;
+  }).join('');
+}
+
+function bindOpportunities() {
+  document.querySelectorAll('.opp-filter').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.opp-filter').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      loadOpportunities(btn.dataset.type);
+    });
+  });
+  const refreshBtn = $('opp-refresh-btn');
+  if (refreshBtn) refreshBtn.addEventListener('click', () => loadOpportunities(_oppType));
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   TECH NEWS  (FastAPI backend: http://localhost:8000)
+   ══════════════════════════════════════════════════════════════════════════ */
+
+let _newsCat = 'tech';
+
+async function loadNews(forcecat) {
+  const cat = forcecat || _newsCat;
+  _newsCat = cat;
+  const grid = $('news-grid');
+  if (!grid) return;
+  grid.innerHTML = '<div class="study-placeholder">Fetching latest news…</div>';
+  try {
+    const res = await fetch(`${FASTAPI}/api/news?category=${cat}&limit=20`);
+    const data = await res.json();
+    renderNewsGrid(data.articles || []);
+  } catch (err) {
+    grid.innerHTML = `<div class="study-placeholder" style="color:var(--danger)">
+      Could not reach FastAPI backend (port 8000).<br>${escHtml(err.message)}
+    </div>`;
+  }
+}
+
+function renderNewsGrid(articles) {
+  const grid = $('news-grid');
+  if (!grid) return;
+  if (!articles.length) {
+    grid.innerHTML = '<div class="study-placeholder">No articles found.</div>';
+    return;
+  }
+  grid.innerHTML = articles.map((a, i) => `
+    <a class="news-card" href="${escHtml(a.link)}" target="_blank" rel="noopener">
+      <div class="news-num">${i + 1}</div>
+      <div class="news-body">
+        <div class="news-title">${escHtml(a.title)}</div>
+        ${a.description ? `<div class="news-desc">${escHtml(a.description)}</div>` : ''}
+        ${a.publishedAt ? `<div class="news-date">${escHtml(a.publishedAt)}</div>` : ''}
+      </div>
+      <svg class="ic news-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M7 17L17 7M17 7H9M17 7v8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>`).join('');
+}
+
+function bindNews() {
+  document.querySelectorAll('.news-cat').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.news-cat').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      loadNews(btn.dataset.cat);
+    });
+  });
+  const refreshBtn = $('news-refresh-btn');
+  if (refreshBtn) refreshBtn.addEventListener('click', () => loadNews(_newsCat));
+}
