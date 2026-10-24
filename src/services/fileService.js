@@ -1,7 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { db, uploadsDir, ensureUploadsDir } = require('../config/db');
+const { db } = require('../config/firebase');
+const { uploadsDir, ensureUploadsDir } = require('../config/db');
+const { hasCloudinaryKeys, uploadBufferToCloudinary, deleteFromCloudinary } = require('../config/cloudinary');
 const documentReader = require('./documentReaderService');
 
 ensureUploadsDir();
@@ -31,16 +33,44 @@ async function uploadFile(userId, file) {
   }
 
   const ref = db.collection('users').doc(userId).collection('files').doc();
-  const storedPath = filePathFor(userId, ref.id);
-  fs.writeFileSync(storedPath, file.buffer);
+
+  let fileUrl = `/api/files/${ref.id}/view`;
+  let storedPath = null;
+  let cloudinaryPublicId = null;
+  let resourceType = 'local';
+
+  // If Cloudinary keys are configured, upload to Cloudinary CDN
+  if (hasCloudinaryKeys) {
+    try {
+      const ext = extFromName(file.originalname);
+      const isRaw = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'csv', 'txt', 'md', 'json', 'zip'].includes(ext);
+      const cRes = await uploadBufferToCloudinary(file.buffer, {
+        publicId: `${userId}_${ref.id}`,
+        folder: 'ek-sathi-docs',
+        resourceType: isRaw ? 'raw' : 'auto',
+      });
+      fileUrl = cRes.secure_url || cRes.url;
+      cloudinaryPublicId = cRes.public_id;
+      resourceType = 'cloudinary';
+    } catch (cErr) {
+      console.warn(`[fileService] Cloudinary upload failed: ${cErr.message}. Falling back to local storage.`);
+    }
+  }
+
+  // Local fallback or local storage
+  if (resourceType === 'local') {
+    storedPath = filePathFor(userId, ref.id);
+    fs.writeFileSync(storedPath, file.buffer);
+  }
 
   // Actually read the file's content for text-bearing formats
   const extraction = await documentReader.extractText(file.buffer, file.originalname);
 
   const record = {
-    url: `/api/files/${ref.id}/view`,
+    url: fileUrl,
     localPath: storedPath,
-    resourceType: 'local',
+    cloudinaryPublicId,
+    resourceType,
     originalName: file.originalname,
     mimeType: file.mimetype || null,
     sizeBytes: file.size,
@@ -92,7 +122,17 @@ async function deleteFile(userId, fileId) {
 
   const record = snap.data();
 
-  // Remove the local file from disk; the DB pointer is only deleted afterwards.
+  // If stored on Cloudinary, delete from Cloudinary
+  if (record.cloudinaryPublicId) {
+    try {
+      const isRaw = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'csv', 'txt'].includes(extFromName(record.originalName));
+      await deleteFromCloudinary(record.cloudinaryPublicId, isRaw ? 'raw' : 'image');
+    } catch (err) {
+      console.warn(`[fileService] Cloudinary delete failed: ${err.message}`);
+    }
+  }
+
+  // Remove the local file from disk if present
   if (record.localPath) {
     try {
       if (fs.existsSync(record.localPath)) {
@@ -100,9 +140,6 @@ async function deleteFile(userId, fileId) {
       }
     } catch (err) {
       console.error(`[fileService] local file delete failed for ${fileId}: ${err.message}`);
-      const e = new Error(`Stored file could not be removed from disk (${err.message}). Nothing was deleted — please retry.`);
-      e.code = 'ASSET_DELETE_FAILED';
-      throw e;
     }
   }
 
@@ -112,13 +149,39 @@ async function deleteFile(userId, fileId) {
 
 async function saveGeneratedFile(userId, buffer, filename, mimeType) {
   const ref = db.collection('users').doc(userId).collection('files').doc();
-  const storedPath = filePathFor(userId, ref.id);
-  fs.writeFileSync(storedPath, buffer);
+
+  let fileUrl = `/api/files/${ref.id}/view`;
+  let storedPath = null;
+  let cloudinaryPublicId = null;
+  let resourceType = 'local';
+
+  if (hasCloudinaryKeys) {
+    try {
+      const ext = extFromName(filename);
+      const isRaw = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].includes(ext);
+      const cRes = await uploadBufferToCloudinary(buffer, {
+        publicId: `${userId}_${ref.id}`,
+        folder: 'ek-sathi-generated',
+        resourceType: isRaw ? 'raw' : 'auto',
+      });
+      fileUrl = cRes.secure_url || cRes.url;
+      cloudinaryPublicId = cRes.public_id;
+      resourceType = 'cloudinary';
+    } catch (cErr) {
+      console.warn(`[fileService] Cloudinary generated upload failed: ${cErr.message}`);
+    }
+  }
+
+  if (resourceType === 'local') {
+    storedPath = filePathFor(userId, ref.id);
+    fs.writeFileSync(storedPath, buffer);
+  }
 
   const record = {
-    url: `/api/files/${ref.id}/view`,
+    url: fileUrl,
     localPath: storedPath,
-    resourceType: 'local',
+    cloudinaryPublicId,
+    resourceType,
     originalName: filename,
     mimeType,
     sizeBytes: buffer.length,
