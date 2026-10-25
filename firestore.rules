@@ -1,0 +1,100 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─────────────────────────────────────────────────────────────
+    // EK SATHI — PRODUCTION SECURITY RULES
+    // ─────────────────────────────────────────────────────────────
+    // Architecture:
+    // 1. Ek Sathi backend runs via Firebase Admin SDK, which automatically
+    //    bypasses security rules and has full read/write privileges.
+    // 2. These rules secure client-side access, ensuring users can only
+    //    access their own email/uid partitions and never read other students' data.
+    // ─────────────────────────────────────────────────────────────
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && (
+        request.auth.uid == userId ||
+        request.auth.token.email.replace('[^a-zA-Z0-9]', '_') == userId
+      );
+    }
+
+    // --- User-Isolated Student Workspaces ---
+    // Matches: users/{userId}/...
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+
+      // Student conversational chat sessions
+      match /sessions/{sessionId} {
+        allow read, write: if isOwner(userId);
+
+        match /messages/{messageId} {
+          allow read, write: if isOwner(userId);
+        }
+      }
+
+      // Saved hackathons, rules, and tracking
+      match /hackathons/{hackathonId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // Hackathon discovery cache per user
+      match /hackathonDiscovery/{cardId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /hackathonDiscoveryMeta/{metaId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // Personal student memory facts and profile rules
+      match /facts/{factId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // Autonomous scheduled tasks and reminders
+      match /scheduledTasks/{taskId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // Monthly memory rollups and weekly summaries
+      match /memoryMonths/{monthId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /monthlyFiles/{fileId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /weeklySummaries/{summaryId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // Secret vault notes & pins
+      match /secretNotes/{noteId} {
+        allow read, write: if isOwner(userId);
+      }
+      match /notifications/{notifId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // --- Global Shared Data (Read-only for users, written by Backend Scrapers) ---
+    // Global news cache, scraped opportunities, tech radar
+    match /global_news/{newsId} {
+      allow read: if true;
+      allow write: if false; // Only server Admin SDK can update
+    }
+    match /global_opportunities/{oppId} {
+      allow read: if true;
+      allow write: if false; // Only server Admin SDK can update
+    }
+
+    // --- Default Deny ---
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

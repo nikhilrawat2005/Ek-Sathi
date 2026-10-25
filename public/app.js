@@ -26,6 +26,9 @@ function setActiveUserEmail(email) {
     updateUserDisplay();
     resetChatUI();
     loadSessions();
+    renderStudyHistory();
+    if ($('view-hackathon').classList.contains('active')) loadDiscoverCards();
+    if ($('view-memory-hub').classList.contains('active')) loadMemoryHub();
   }
 }
 
@@ -836,19 +839,30 @@ async function analyzeWebsite(fresh) {
   }
 }
 
-/* ── Study: Persistent History (chips, re-scrape on click) ─ */
-const STUDY_HISTORY_KEY = 'es_study_history_v1';
+/* ── Study: Persistent History (Per-student email isolated) ─ */
 const STUDY_HISTORY_CAP = 12;
 let _studyHistory = [];
 
+function getStudyHistoryStorageKey() {
+  const email = getActiveUserEmail();
+  return `es_study_history_${email.replace(/[^a-z0-9]/g, '_')}`;
+}
+
 function loadStudyHistory() {
-  try { _studyHistory = JSON.parse(localStorage.getItem(STUDY_HISTORY_KEY) || '[]'); }
-  catch (e) { _studyHistory = []; }
+  try {
+    const key = getStudyHistoryStorageKey();
+    _studyHistory = JSON.parse(localStorage.getItem(key) || '[]');
+  } catch (e) {
+    _studyHistory = [];
+  }
   if (!Array.isArray(_studyHistory)) _studyHistory = [];
   return _studyHistory;
 }
 function saveStudyHistory() {
-  try { localStorage.setItem(STUDY_HISTORY_KEY, JSON.stringify(_studyHistory)); } catch (e) {}
+  try {
+    const key = getStudyHistoryStorageKey();
+    localStorage.setItem(key, JSON.stringify(_studyHistory));
+  } catch (e) {}
 }
 function addStudyHistory(kind, value, label) {
   const norm = String(value).trim().replace(/\/+$/, '');
