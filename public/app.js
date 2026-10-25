@@ -5,10 +5,10 @@
    ═══════════════════════════════════════════════════════════ */
 'use strict';
 
-// Automatically determine API base: if opened via file:// or another port, fallback gracefully
+// Automatically determine API base: on Vercel or any live host, origin is window.location.origin
 const API = (typeof window !== 'undefined' && window.location && window.location.origin && window.location.origin.startsWith('http'))
-  ? ''
-  : 'http://localhost:3000';
+  ? window.location.origin
+  : '';
 
 /* ── User & Multi-tenant State ──────────────────────────── */
 function getActiveUserEmail() {
@@ -1600,12 +1600,9 @@ function init() {
 document.addEventListener('DOMContentLoaded', init);
 
 /* ══════════════════════════════════════════════════════════════════════════
-   OPPORTUNITY FINDER  (FastAPI backend: http://localhost:8000)
+   OPPORTUNITY FINDER (Vercel Serverless / Express /api/opportunities)
    ══════════════════════════════════════════════════════════════════════════ */
 
-const FASTAPI = (typeof window !== 'undefined' && window.location && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1')
-  ? (window.location.origin)
-  : 'http://localhost:8000';
 let _oppType = 'all';
 let _oppData = [];
 
@@ -1616,12 +1613,7 @@ async function loadOpportunities(forceType) {
   if (!grid) return;
   grid.innerHTML = '<div class="study-placeholder">Loading opportunities…</div>';
   try {
-    let res;
-    try {
-      res = await fetch(`/api/opportunities${type !== 'all' ? `?type=${type}` : ''}`);
-    } catch (_) {
-      res = await fetch(`${FASTAPI}/api/opportunities${type !== 'all' ? `?type=${type}` : ''}`);
-    }
+    const res = await fetch(`/api/opportunities${type !== 'all' ? `?type=${type}` : ''}`);
     const data = await res.json();
     _oppData = data.opportunities || [];
     renderOppGrid(_oppData);
@@ -1676,7 +1668,7 @@ function bindOpportunities() {
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
-   TECH NEWS  (FastAPI backend: http://localhost:8000)
+   TECH NEWS (Vercel Serverless / Express /api/news)
    ══════════════════════════════════════════════════════════════════════════ */
 
 let _newsCat = 'tech';
@@ -1688,12 +1680,7 @@ async function loadNews(forcecat) {
   if (!grid) return;
   grid.innerHTML = '<div class="study-placeholder">Fetching latest news…</div>';
   try {
-    let res;
-    try {
-      res = await fetch(`/api/news?category=${cat}&limit=20`);
-    } catch (_) {
-      res = await fetch(`${FASTAPI}/api/news?category=${cat}&limit=20`);
-    }
+    const res = await fetch(`/api/news?category=${cat}&limit=20`);
     const data = await res.json();
     renderNewsGrid(data.articles || []);
   } catch (err) {
