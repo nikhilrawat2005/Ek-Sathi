@@ -9,7 +9,37 @@
 const API = (typeof window !== 'undefined' && window.location && window.location.origin && window.location.origin.startsWith('http'))
   ? ''
   : 'http://localhost:3000';
-const TOKEN = 'dev-local';    // local-only auth token
+
+/* ── User & Multi-tenant State ──────────────────────────── */
+function getActiveUserEmail() {
+  let email = localStorage.getItem('eksathi_user_email');
+  if (!email || !email.includes('@')) {
+    email = 'student@eksathi.ai';
+    localStorage.setItem('eksathi_user_email', email);
+  }
+  return email.toLowerCase().trim();
+}
+
+function setActiveUserEmail(email) {
+  if (email && email.includes('@')) {
+    localStorage.setItem('eksathi_user_email', email.toLowerCase().trim());
+    updateUserDisplay();
+    resetChatUI();
+    loadSessions();
+  }
+}
+
+function updateUserDisplay() {
+  const email = getActiveUserEmail();
+  const namePart = email.split('@')[0];
+  const char = (namePart[0] || 'U').toUpperCase();
+  const avatarChar = $('user-avatar-char');
+  if (avatarChar) avatarChar.textContent = char;
+  const nameEl = $('user-display-name');
+  if (nameEl) nameEl.textContent = namePart.replace(/[._-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  const emailEl = $('user-display-email');
+  if (emailEl) emailEl.textContent = email;
+}
 
 /* ── State ─────────────────────────────────────────────── */
 let currentSessionId = null;
@@ -22,7 +52,12 @@ const escHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;
 
 /* ── API helpers ───────────────────────────────────────── */
 async function apiFetch(url, opts = {}) {
-  const headers = { Authorization: `Bearer ${TOKEN}`, ...(opts.headers || {}) };
+  const email = getActiveUserEmail();
+  const headers = {
+    'Authorization': `Bearer email:${email}`,
+    'x-user-email': email,
+    ...(opts.headers || {})
+  };
   let res;
   try {
     res = await fetch(API + url, { ...opts, headers });
@@ -1221,7 +1256,16 @@ function clearResume() {
 }
 
 async function downloadFile(url, payload, filename) {
-  const res = await fetch(API + url, { method: 'POST', headers: { Authorization: `Bearer ${TOKEN}`, 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  const email = getActiveUserEmail();
+  const res = await fetch(API + url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer email:${email}`,
+      'x-user-email': email,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  });
   if (!res.ok) { let d = null; try { d = await res.json(); } catch (e) { /* non-JSON */ } throw new Error((d && d.error) || 'HTTP ' + res.status); }
   const blob = await res.blob();
   const a = document.createElement('a');
@@ -1508,9 +1552,23 @@ function init() {
     [$('toggle-sidebar-btn'), $('mobile-menu-btn')].forEach((b) => b && b.addEventListener('click', toggleSide));
     document.querySelectorAll('.nav-btn').forEach((b) => b.addEventListener('click', closeSide));
   }
-  $('logout-btn').addEventListener('click', () => {
-    if (confirm('Clear local preferences and reload?')) { localStorage.clear(); location.reload(); }
-  });
+
+  // Account switch modal / prompt
+  const handleSwitchAccount = () => {
+    const cur = getActiveUserEmail();
+    const entered = prompt('Enter student email address to load personal workspace & saved hackathons:\n(e.g. nikhil@gmail.com, student@college.edu)', cur);
+    if (entered && entered.trim() && entered.includes('@')) {
+      setActiveUserEmail(entered.trim());
+      alert(`Switched to student workspace: ${entered.trim()}`);
+    }
+  };
+
+  const switchBtn = $('switch-account-btn');
+  if (switchBtn) switchBtn.addEventListener('click', (e) => { e.stopPropagation(); handleSwitchAccount(); });
+  const profileRow = $('user-profile-row');
+  if (profileRow) profileRow.addEventListener('click', handleSwitchAccount);
+
+  updateUserDisplay();
 
   // Cards view triggers
   const cardsHeaderBtn = $('chat-cards-btn');

@@ -57,14 +57,14 @@
         <div class="sessions-list" id="sessions-list"></div>
       </div>
       <div class="sidebar-bottom">
-        <div class="user-row">
-          <div class="user-avatar"><span>Y</span></div>
+        <div class="user-row" id="user-profile-row" title="Click to switch student email account" style="cursor: pointer;">
+          <div class="user-avatar" id="user-avatar"><span id="user-avatar-char">S</span></div>
           <div class="user-info">
-            <div class="user-name">You</div>
-            <div class="user-email">Local mode</div>
+            <div class="user-name" id="user-display-name">Student Account</div>
+            <div class="user-email" id="user-display-email">student@eksathi.ai</div>
           </div>
-          <button class="btn-icon" id="logout-btn" title="Clear local data" aria-label="Clear local data">
-            <svg class="ic"><use href="#i-trash" /></svg>
+          <button class="btn-icon" id="switch-account-btn" title="Switch account" aria-label="Switch account">
+            <svg class="ic"><use href="#i-user" /></svg>
           </button>
         </div>
       </div>
