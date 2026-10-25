@@ -1,0 +1,121 @@
+=============================================================================
+                    EK SATHI — CLOUD & DEPLOYMENT SETUP GUIDE
+=============================================================================
+This comprehensive guide provides step-by-step instructions for configuring 
+Firebase Cloud Firestore, Cloudinary CDN storage, and Vercel Deployment.
+
+NOTE: Ek Sathi features a Dual-Mode Architecture. 
+If these keys are left empty, the application runs 100% locally with zero crashes 
+using our unified JSON filesystem database (`data/store.json`).
+When keys are added to `.env` or Vercel Environment Variables, it seamlessly 
+promotes to cloud-native mode!
+
+-----------------------------------------------------------------------------
+1. GOOGLE FIREBASE CLOUD SETUP (Authentication & Cloud Firestore)
+-----------------------------------------------------------------------------
+Ek Sathi uses Firebase Admin SDK to connect directly to Cloud Firestore.
+
+Step 1: Create a Project
+1. Go to the Firebase Console: https://console.firebase.google.com/
+2. Click "Add project" and name it (e.g., `ek-sathi-prod`).
+3. (Optional) Disable Google Analytics for faster setup, then click "Create project".
+
+Step 2: Enable Cloud Firestore
+1. In the Firebase console left menu, go to "Build" -> "Firestore Database".
+2. Click "Create database".
+3. Choose a location closest to your users (e.g., `asia-south1` Mumbai).
+4. Select "Start in test mode" (or configure security rules as preferred) and click "Enable".
+
+Step 3: Generate Service Account Key Credentials
+1. Click the Gear Icon ⚙ next to "Project Overview" in the top-left -> "Project settings".
+2. Click on the "Service accounts" tab.
+3. Make sure "Node.js" is selected under Admin SDK.
+4. Click the "Generate new private key" button.
+5. A `.json` credentials file will download to your computer.
+
+Step 4: Configure Your Environment Variables
+Open the downloaded JSON file and extract these 3 values:
+- `project_id`
+- `client_email`
+- `private_key`
+
+Add them to your `.env` (or Vercel Environment Variables):
+FIREBASE_PROJECT_ID="your-project-id"
+FIREBASE_CLIENT_EMAIL="firebase-adminsdk-xxxxx@your-project-id.iam.gserviceaccount.com"
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC...\n-----END PRIVATE KEY-----\n"
+
+*IMPORTANT FOR VERCEL & WINDOWS: Ensure newlines in `FIREBASE_PRIVATE_KEY` are represented as `\n` or enclosed in double quotes.
+
+-----------------------------------------------------------------------------
+2. CLOUDINARY SETUP (Media & Resume Document CDN Storage)
+-----------------------------------------------------------------------------
+Ek Sathi uploads student resumes, generated documents, and study assets to Cloudinary.
+
+Step 1: Create a Free Account
+1. Visit https://cloudinary.com/users/register_free and sign up.
+2. Sign in to your Cloudinary Dashboard: https://console.cloudinary.com/
+
+Step 2: Copy API Keys
+On your Cloudinary Dashboard homepage ("Product Environment Details"), copy:
+1. Cloud Name
+2. API Key
+3. API Secret
+
+Step 3: Configure Your Environment Variables
+Add these to your `.env` or Vercel:
+CLOUDINARY_CLOUD_NAME="your_cloud_name"
+CLOUDINARY_API_KEY="your_api_key"
+CLOUDINARY_API_SECRET="your_api_secret"
+
+When set, file uploads in the Resume and Study lab are automatically uploaded 
+to Cloudinary and returned as secure CDN links.
+
+-----------------------------------------------------------------------------
+3. VERCEL DEPLOYMENT SETUP
+-----------------------------------------------------------------------------
+Ek Sathi includes a pre-configured `vercel.json` file for single-command serverless deployment.
+
+Prerequisites:
+- Push your project to a GitHub repository (already pushed to https://github.com/nikhilrawat2005/Ek-Sathi).
+
+Step 1: Import Project to Vercel
+1. Log in to Vercel: https://vercel.com
+2. Click "Add New..." -> "Project".
+3. Select your GitHub account and import `Ek-Sathi` (or search for it).
+
+Step 2: Configure Project Settings
+1. Framework Preset: Choose "Other" (or let it auto-detect).
+2. Root Directory: `./` (leave default).
+3. Build Command: (Leave empty or default).
+4. Output Directory: (Leave empty or default).
+
+Step 3: Add Environment Variables
+Under the "Environment Variables" collapsible section, add:
+- `OPENROUTER_API_KEY1` = (Your OpenRouter Key)
+- `FIREBASE_PROJECT_ID` = (From Step 1)
+- `FIREBASE_CLIENT_EMAIL` = (From Step 1)
+- `FIREBASE_PRIVATE_KEY` = (From Step 1)
+- `CLOUDINARY_CLOUD_NAME` = (From Step 2)
+- `CLOUDINARY_API_KEY` = (From Step 2)
+- `CLOUDINARY_API_SECRET` = (From Step 2)
+- `SHARED_ADMIN_ID` = nikhil_master_workspace
+- `VERCEL` = 1
+
+Step 4: Deploy
+1. Click the "Deploy" button.
+2. Vercel will build and serve:
+   - Frontend static assets from `public/`
+   - Express backend routes as serverless endpoints (`/api/...`)
+3. Once completed, Vercel will assign you a live HTTPS URL (e.g., `https://ek-sathi.vercel.app`).
+
+=============================================================================
+4. RUNNING LOCALLY (Without Any Cloud Keys)
+=============================================================================
+If you ever want to run without internet keys or show an offline demo:
+1. `npm install`
+2. `npm start` (or `npm run dev`)
+3. Open http://localhost:4646
+
+Ek Sathi automatically uses its built-in local JSON database, simulated cloud storage, 
+and local scraper caching without requiring Firebase or Cloudinary!
+=============================================================================
