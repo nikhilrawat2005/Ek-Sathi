@@ -1686,7 +1686,10 @@ function renderNewsGrid(articles) {
       <div class="news-body">
         <div class="news-title">${escHtml(a.title)}</div>
         ${a.description ? `<div class="news-desc">${escHtml(a.description)}</div>` : ''}
-        ${a.publishedAt ? `<div class="news-date">${escHtml(a.publishedAt)}</div>` : ''}
+        <div class="news-footer">
+          ${a.publishedAt ? `<span class="news-date">${escHtml(a.publishedAt)}</span>` : ''}
+          <span class="news-readmore">Read full story &rarr;</span>
+        </div>
       </div>
       <svg class="ic news-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M7 17L17 7M17 7H9M17 7v8" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </a>`).join('');

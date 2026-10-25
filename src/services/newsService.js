@@ -21,8 +21,15 @@ const FEEDS = {
     'https://feeds.bbci.co.uk/news/world/rss.xml',
   ],
   tech:   [
-    'https://hnrss.org/frontpage',
+    'https://techcrunch.com/category/artificial-intelligence/feed/',
+    'https://feeds.arstechnica.com/arstechnica/index',
     'https://feeds.bbci.co.uk/news/technology/rss.xml',
+    'https://hnrss.org/frontpage',
+  ],
+  ai:     [
+    'https://techcrunch.com/category/artificial-intelligence/feed/',
+    'https://feeds.bbci.co.uk/news/technology/rss.xml',
+    'https://feeds.feedburner.com/oreilly/radar/atom',
   ],
   sports: [
     'https://www.espncricinfo.com/rss/content/story/feeds/0.xml',
@@ -62,6 +69,13 @@ async function fetchText(url, timeoutMs = 8000) {
 function decodeEntities(str) {
   return String(str || '')
     .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+    .replace(/&#8217;/g, "’")
+    .replace(/&#8216;/g, "‘")
+    .replace(/&#8220;/g, "“")
+    .replace(/&#8221;/g, "”")
+    .replace(/&#8211;/g, "–")
+    .replace(/&#8212;/g, "—")
+    .replace(/&#039;/g, "'")
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
@@ -74,13 +88,64 @@ function decodeEntities(str) {
 
 function parseRSS(xml) {
   const items = [];
-  const itemRe = /<item>([\s\S]*?)<\/item>/g;
+  const itemRe = /<(?:item|entry)>([\s\S]*?)<\/(?:item|entry)>/g;
   let m;
   while ((m = itemRe.exec(xml)) !== null && items.length < 30) {
     const body = m[1];
-    const title = decodeEntities((body.match(/<title>([\s\S]*?)<\/title>/) || [, ''])[1]);
-    const link = ((body.match(/<link>([\s\S]*?)<\/link>/) || [, ''])[1]).trim();
-    if (title && link) items.push({ title, link });
+    const rawTitle = (body.match(/<title[^>]*>([\s\S]*?)<\/title>/) || [, ''])[1];
+    const title = decodeEntities(rawTitle);
+
+    let rawLink = (body.match(/<link[^>]*>([\s\S]*?)<\/link>/) || [, ''])[1];
+    if (!rawLink) {
+      // Atom feed href
+      const atomLink = body.match(/<link[^>]+href=["']([^"']+)["']/);
+      if (atomLink) rawLink = atomLink[1];
+    }
+    const link = decodeEntities(rawLink).trim();
+
+    let rawDesc = (body.match(/<description[^>]*>([\s\S]*?)<\/description>/) || [, ''])[1];
+    if (!rawDesc) {
+      rawDesc = (body.match(/<summary[^>]*>([\s\S]*?)<\/summary>/) || [, ''])[1];
+    }
+    let description = decodeEntities(rawDesc);
+
+    // If description is just HN points & comments URL, format it cleanly
+    if (description.includes('Article URL:') || description.includes('Comments URL:')) {
+      const pts = (description.match(/Points:\s*(\d+)/i) || [, ''])[1];
+      const cms = (description.match(/# Comments:\s*(\d+)/i) || [, ''])[1];
+      if (pts || cms) {
+        description = `Trending on Hacker News: ${pts ? pts + ' upvotes' : ''}${pts && cms ? ' · ' : ''}${cms ? cms + ' community comments' : ''}. Tap to explore discussion & source.`;
+      } else {
+        description = 'Trending discussion on Hacker News. Tap to read the full source and community insights.';
+      }
+    }
+
+    // Clean up excessive whitespace
+    description = description.replace(/\s+/g, ' ').trim();
+    if (description.length > 280) {
+      description = description.slice(0, 277).trim() + '...';
+    }
+
+    // Extract pubDate if available
+    const rawDate = (body.match(/<(?:pubDate|published|updated)[^>]*>([\s\S]*?)<\/(?:pubDate|published|updated)>/) || [, ''])[1];
+    let publishedAt = '';
+    if (rawDate) {
+      try {
+        const d = new Date(decodeEntities(rawDate));
+        if (!isNaN(d.getTime())) {
+          publishedAt = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        }
+      } catch (_) {}
+    }
+
+    if (title && link) {
+      items.push({
+        title,
+        link,
+        description: description || 'Click to read full coverage, breakdown, and technical background.',
+        publishedAt: publishedAt || 'Latest update'
+      });
+    }
   }
   return items;
 }
