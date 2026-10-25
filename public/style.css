@@ -1198,3 +1198,323 @@ input::placeholder, textarea::placeholder { color: var(--text3); }
     gap: var(--sp-4);
   }
 }
+
+/* ─── SYSTEM STATUS & KEY MONITOR ───────────────────── */
+.status-view-container, .memory-view-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--sp-6);
+  max-width: 1040px;
+  margin: 0 auto;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-6);
+}
+
+.sys-section-block {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  padding: var(--sp-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  box-shadow: var(--sh-xs);
+}
+
+.sys-section-header {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-md);
+  font-weight: 700;
+  color: var(--text);
+}
+.sys-section-header svg.ic {
+  width: 18px;
+  height: 18px;
+  color: var(--accent);
+}
+
+.sys-sched-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.sys-sched-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sys-sched-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.sys-sched-title {
+  font-size: var(--fs-base);
+  font-weight: 700;
+  color: var(--text);
+}
+
+.sys-sched-freq {
+  font-size: var(--fs-xs);
+  color: var(--text2);
+}
+
+.sys-sched-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--sp-3);
+  margin-top: 4px;
+}
+
+.sys-sched-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 8px 12px;
+}
+
+.sys-sublabel {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  color: var(--text3);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.sys-subval {
+  font-size: var(--fs-sm);
+  color: var(--text);
+  font-weight: 600;
+}
+.sys-subval.highlight {
+  color: var(--accent);
+}
+
+.sys-summary-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.sys-bags-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--sp-4);
+}
+
+.sys-bag-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.sys-bag-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+}
+
+.sys-bag-name {
+  font-weight: 700;
+  font-size: var(--fs-sm);
+  color: var(--text);
+}
+
+.sys-bag-counts {
+  display: flex;
+  gap: 6px;
+}
+
+.sys-pill {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--r-full);
+}
+.sys-pill.ok {
+  background: rgba(22, 163, 74, 0.12);
+  color: var(--green-dark);
+}
+.sys-pill.warn {
+  background: rgba(217, 119, 6, 0.12);
+  color: var(--amber-dark);
+}
+.sys-pill.neutral {
+  background: var(--surface);
+  color: var(--text3);
+  border: 1px solid var(--border);
+}
+
+.sys-keys-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sys-key-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  font-size: var(--fs-xs);
+}
+
+.sys-key-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.sys-key-state {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sys-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.sys-dot.ok { background: var(--green); }
+.sys-dot.warn { background: var(--amber); }
+
+.sys-badge {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: var(--r-full);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.sys-badge.green {
+  background: rgba(22, 163, 74, 0.12);
+  color: var(--green-dark);
+}
+.sys-badge.amber {
+  background: rgba(217, 119, 6, 0.12);
+  color: var(--amber-dark);
+}
+.sys-badge.blue {
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--accent);
+}
+
+/* ─── UNIFIED MEMORY HUB STYLING ────────────────────── */
+.mem-banner {
+  background: linear-gradient(135deg, rgba(37,99,235,0.06), rgba(16,185,129,0.06));
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  padding: var(--sp-5);
+}
+.mem-banner-title {
+  font-size: var(--fs-md);
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+.mem-banner-sub {
+  font-size: var(--fs-sm);
+  color: var(--text2);
+  line-height: 1.5;
+}
+
+.mem-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+  gap: var(--sp-4);
+}
+
+.mem-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  padding: var(--sp-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  box-shadow: var(--sh-xs);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+.mem-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(var(--accent-rgb), 0.3);
+}
+
+.mem-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.mem-card-title {
+  font-size: var(--fs-base);
+  font-weight: 700;
+  color: var(--text);
+}
+
+.mem-card-desc {
+  font-size: var(--fs-xs);
+  color: var(--text2);
+  line-height: 1.45;
+}
+
+.mem-items-box {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: var(--sp-3);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+  font-size: var(--fs-xs);
+}
+
+.mem-item-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--text);
+  line-height: 1.4;
+}
+.mem-bullet {
+  color: var(--accent);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.mem-text {
+  flex: 1;
+  word-break: break-word;
+}
+

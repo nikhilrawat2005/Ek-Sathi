@@ -11,6 +11,7 @@ const studyRoute         = require('./routes/study');
 const resumeRoute        = require('./routes/resume');
 const newsRoute          = require('./routes/news');
 const opportunitiesRoute = require('./routes/opportunities');
+const systemRoute        = require('./routes/system');
 
 const app = express();
 
@@ -41,6 +42,7 @@ app.use('/api/study',         studyRoute);
 app.use('/api/resume',        resumeRoute);
 app.use('/api/news',          newsRoute);
 app.use('/api/opportunities', opportunitiesRoute);
+app.use('/api/system',        systemRoute);
 
 // 404 handler for unknown API routes
 app.use('/api', (req, res) => {

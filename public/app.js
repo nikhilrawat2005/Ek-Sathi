@@ -42,6 +42,8 @@ function showView(view) {
   if (view === 'hackathon') loadDiscoverCards();
   if (view === 'opportunities') loadOpportunities();
   if (view === 'news') loadNews();
+  if (view === 'system-status') loadSystemStatus();
+  if (view === 'memory-hub') loadMemoryHub();
 }
 
 /* ── Sessions ──────────────────────────────────────────── */
@@ -1675,4 +1677,199 @@ function bindNews() {
   });
   const refreshBtn = $('news-refresh-btn');
   if (refreshBtn) refreshBtn.addEventListener('click', () => loadNews(_newsCat));
+
+  const sysRefBtn = $('system-status-refresh-btn');
+  if (sysRefBtn) sysRefBtn.addEventListener('click', loadSystemStatus);
+
+  const memRefBtn = $('memory-hub-refresh-btn');
+  if (memRefBtn) memRefBtn.addEventListener('click', loadMemoryHub);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SCHEDULE & API KEY MONITOR
+   ══════════════════════════════════════════════════════════════════════════ */
+
+async function loadSystemStatus() {
+  const container = $('system-status-container');
+  if (!container) return;
+  container.innerHTML = '<div class="study-placeholder">Fetching schedule intervals &amp; API key pool...</div>';
+  try {
+    const data = await apiFetch('/api/system/status');
+    renderSystemStatus(data);
+  } catch (err) {
+    container.innerHTML = `<div class="study-placeholder" style="color:var(--danger)">Failed to load system status: ${escHtml(err.message)}</div>`;
+  }
+}
+
+function renderSystemStatus(data) {
+  const container = $('system-status-container');
+  if (!container) return;
+
+  const kb = data.keyBags || {};
+  const schedules = data.schedules || [];
+
+  const schedHtml = schedules.map((s) => {
+    const lastDate = s.lastScrape ? new Date(s.lastScrape).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Never';
+    const nextDate = s.nextScrape ? new Date(s.nextScrape).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Pending next tick';
+    return `
+      <div class="sys-sched-card">
+        <div class="sys-sched-head">
+          <div class="sys-sched-title">${escHtml(s.name)}</div>
+          <span class="sys-badge ${s.status === 'Active' ? 'green' : 'amber'}">${escHtml(s.status)}</span>
+        </div>
+        <div class="sys-sched-freq"><strong>Frequency:</strong> ${escHtml(s.frequency)}</div>
+        <div class="sys-sched-grid">
+          <div class="sys-sched-item">
+            <span class="sys-sublabel">Last Scraped</span>
+            <span class="sys-subval">${lastDate}</span>
+          </div>
+          <div class="sys-sched-item">
+            <span class="sys-sublabel">Next Scheduled Scrape</span>
+            <span class="sys-subval highlight">${nextDate}</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  const bagsHtml = (kb.bags || []).map((bag) => {
+    const keysHtml = (bag.keys || []).map((k) => {
+      const isOk = k.status === 'active';
+      return `
+        <div class="sys-key-row">
+          <div class="sys-key-label">
+            <span class="sys-dot ${isOk ? 'ok' : 'warn'}"></span>
+            <span>${escHtml(k.label || 'API Key')}</span>
+          </div>
+          <div class="sys-key-state">
+            <span class="sys-badge ${isOk ? 'green' : 'amber'}">${isOk ? 'Active in Rotation' : 'Fallback / Cooldown'}</span>
+            ${k.cooldownRemainingSec ? `<span class="sys-time">(${k.cooldownRemainingSec}s left)</span>` : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="sys-bag-card">
+        <div class="sys-bag-head">
+          <div class="sys-bag-name">${escHtml(bag.name)}</div>
+          <div class="sys-bag-counts">
+            <span class="sys-pill ok">${bag.active} Active</span>
+            <span class="sys-pill ${bag.inCooldownOrFallback > 0 ? 'warn' : 'neutral'}">${bag.inCooldownOrFallback} Fallback/Cooldown</span>
+          </div>
+        </div>
+        <div class="sys-keys-list">
+          ${keysHtml || '<div class="dim" style="font-size:12px;padding:8px">No keys loaded in this pool bag.</div>'}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  container.innerHTML = `
+    <div class="sys-section-block">
+      <div class="sys-section-header">
+        <svg class="ic"><use href="#i-refresh" /></svg>
+        <span>Automated 2-4 Day Background Scraping Schedule</span>
+      </div>
+      <div class="sys-sched-list">${schedHtml}</div>
+    </div>
+
+    <div class="sys-section-block">
+      <div class="sys-section-header">
+        <svg class="ic"><use href="#i-spark" /></svg>
+        <span>LLM Key Bucket &amp; Rotation Pool Status</span>
+      </div>
+      <div class="sys-summary-chips">
+        <span class="re-meta-chip">Total Configured: ${kb.totalKeysConfigured || 0}</span>
+        <span class="re-meta-chip" style="color:var(--green)">Active: ${kb.activeKeys || 0}</span>
+        <span class="re-meta-chip" style="color:var(--amber)">In Fallback/Cooldown: ${kb.fallbackKeys || 0}</span>
+      </div>
+      <div class="sys-bags-grid">${bagsHtml}</div>
+    </div>
+  `;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   UNIFIED STUDENT MEMORY HUB
+   ══════════════════════════════════════════════════════════════════════════ */
+
+async function loadMemoryHub() {
+  const container = $('memory-hub-container');
+  if (!container) return;
+  container.innerHTML = '<div class="study-placeholder">Loading contextual student memory vaults...</div>';
+  try {
+    const data = await apiFetch('/api/system/memory-hub');
+    renderMemoryHub(data);
+  } catch (err) {
+    container.innerHTML = `<div class="study-placeholder" style="color:var(--danger)">Failed to load memory hub: ${escHtml(err.message)}</div>`;
+  }
+}
+
+function renderMemoryHub(data) {
+  const container = $('memory-hub-container');
+  if (!container) return;
+
+  const cats = data.categories || {};
+  const catEntries = Object.entries(cats);
+
+  const cardsHtml = catEntries.map(([key, cat]) => {
+    let itemsHtml = '';
+    const items = cat.items || [];
+
+    if (!items.length) {
+      itemsHtml = '<div class="dim" style="font-size:12px;padding:6px 0">No records stored in this memory vault yet.</div>';
+    } else {
+      itemsHtml = items.map((it) => {
+        if (key === 'chatSessions') {
+          return `
+            <div class="mem-item-row">
+              <span class="mem-bullet">•</span>
+              <span class="mem-text"><strong>${escHtml(it.title)}</strong></span>
+            </div>
+          `;
+        }
+        if (key === 'vaultNotes') {
+          return `
+            <div class="mem-item-row">
+              <span class="mem-bullet">📌</span>
+              <span class="mem-text">${escHtml(it.title || it.text || 'Pinned note')}</span>
+            </div>
+          `;
+        }
+        if (key === 'weeklyRollingSummaries') {
+          return `
+            <div class="mem-item-row">
+              <span class="mem-bullet">🗓️</span>
+              <span class="mem-text">${escHtml(it.summary || it.text || 'Weekly rollup digest')}</span>
+            </div>
+          `;
+        }
+        return `
+          <div class="mem-item-row">
+            <span class="mem-bullet">✓</span>
+            <span class="mem-text">${escHtml(it.text || it.value || it.label || JSON.stringify(it))}</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    return `
+      <div class="mem-card">
+        <div class="mem-card-head">
+          <div class="mem-card-title">${escHtml(cat.title)}</div>
+          <span class="sys-badge blue">${cat.count || 0} Entries</span>
+        </div>
+        <p class="mem-card-desc">${escHtml(cat.description)}</p>
+        <div class="mem-items-box">${itemsHtml}</div>
+      </div>
+    `;
+  }).join('');
+
+  container.innerHTML = `
+    <div class="mem-banner">
+      <div class="mem-banner-title">🧠 Multi-Context Isolated Memory Engine</div>
+      <div class="mem-banner-sub">Each student activity (Chat interactions, Career Goals, Technical Rules, and Private Vault Notes) is organized into independent contextual partitions to prevent cross-contamination while preserving lifelong continuity.</div>
+    </div>
+    <div class="mem-grid">${cardsHtml}</div>
+  `;
 }

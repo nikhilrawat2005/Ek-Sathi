@@ -196,6 +196,30 @@
                 <div class="cards-hub-cta">Read Tech News &rarr;</div>
               </div>
             </div>
+
+            <div class="cards-hub-card" data-view-target="system-status">
+              <div class="cards-hub-icon-wrap" style="--hub-accent:#6366f1;--hub-bg:rgba(99,102,241,0.08)">
+                <svg class="ic"><use href="#i-refresh" /></svg>
+              </div>
+              <div class="cards-hub-body">
+                <div class="cards-hub-badge">Automation &amp; Infra</div>
+                <h3 class="cards-hub-title">Schedule &amp; API Key Monitor</h3>
+                <p class="cards-hub-desc">Track automated 2-4 day web scraping schedules, live crawler intervals, and active vs fallback LLM key bag health.</p>
+                <div class="cards-hub-cta">View Key Bucket &amp; Cron &rarr;</div>
+              </div>
+            </div>
+
+            <div class="cards-hub-card" data-view-target="memory-hub">
+              <div class="cards-hub-icon-wrap" style="--hub-accent:#10b981;--hub-bg:rgba(16,185,129,0.08)">
+                <svg class="ic"><use href="#i-bookmark" /></svg>
+              </div>
+              <div class="cards-hub-body">
+                <div class="cards-hub-badge">Context &amp; Intelligence</div>
+                <h3 class="cards-hub-title">Unified Student Memory</h3>
+                <p class="cards-hub-desc">Isolated contextual memory vaults: conversational history, identity facts, learning goals, technical rules &amp; pins.</p>
+                <div class="cards-hub-cta">Explore Memory Vaults &rarr;</div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -389,6 +413,56 @@
         </div>
         <div class="news-grid" id="news-grid">
           <div class="study-placeholder">Loading news…</div>
+        </div>
+      </section>
+
+      <!-- ─── SCHEDULE & API KEY MONITOR VIEW ─── -->
+      <section class="view" id="view-system-status">
+        <div class="view-header">
+          <div style="display:flex;align-items:center;gap:var(--sp-3)">
+            <button class="btn-outline back-to-cards-btn" title="Back to Cards" style="padding:6px 12px;font-size:var(--fs-xs);gap:5px">
+              <svg class="ic" style="width:14px;height:14px;transform:rotate(180deg)"><use href="#i-send" /></svg>
+              <span>Cards</span>
+            </button>
+            <div>
+              <div class="view-title">Schedule &amp; API Key Monitor</div>
+              <div class="view-sub">Real-time automation timeline &amp; LLM key-bucket rotation status</div>
+            </div>
+          </div>
+          <div class="view-header-actions">
+            <button class="btn-small" id="system-status-refresh-btn">
+              <svg class="ic" style="width:14px;height:14px"><use href="#i-refresh" /></svg>
+              <span>Refresh</span>
+            </button>
+          </div>
+        </div>
+        <div class="status-view-container" id="system-status-container">
+          <div class="study-placeholder">Loading schedule &amp; key status…</div>
+        </div>
+      </section>
+
+      <!-- ─── UNIFIED STUDENT MEMORY VIEW ─── -->
+      <section class="view" id="view-memory-hub">
+        <div class="view-header">
+          <div style="display:flex;align-items:center;gap:var(--sp-3)">
+            <button class="btn-outline back-to-cards-btn" title="Back to Cards" style="padding:6px 12px;font-size:var(--fs-xs);gap:5px">
+              <svg class="ic" style="width:14px;height:14px;transform:rotate(180deg)"><use href="#i-send" /></svg>
+              <span>Cards</span>
+            </button>
+            <div>
+              <div class="view-title">Unified Student Memory</div>
+              <div class="view-sub">Multi-tier contextual storage: chat history, profile facts, learning goals &amp; rules</div>
+            </div>
+          </div>
+          <div class="view-header-actions">
+            <button class="btn-small" id="memory-hub-refresh-btn">
+              <svg class="ic" style="width:14px;height:14px"><use href="#i-refresh" /></svg>
+              <span>Refresh</span>
+            </button>
+          </div>
+        </div>
+        <div class="memory-view-container" id="memory-hub-container">
+          <div class="study-placeholder">Loading student memories…</div>
         </div>
       </section>
 
