@@ -50,11 +50,6 @@
       <nav class="sidebar-nav">
         <button class="nav-btn active" data-view="chat"><svg class="ic"><use href="#i-chat" /></svg><span>Chat</span></button>
         <button class="nav-btn" data-view="cards"><svg class="ic"><use href="#i-box" /></svg><span>Cards</span></button>
-        <button class="nav-btn" data-view="hackathon"><svg class="ic"><use href="#i-trophy" /></svg><span>Hackathon Lab</span></button>
-        <button class="nav-btn" data-view="study"><svg class="ic"><use href="#i-book" /></svg><span>Study</span></button>
-        <button class="nav-btn" data-view="resume"><svg class="ic"><use href="#i-file" /></svg><span>Resume Audit</span></button>
-        <button class="nav-btn" data-view="opportunities"><svg class="ic"><use href="#i-search" /></svg><span>Opportunities</span></button>
-        <button class="nav-btn" data-view="news"><svg class="ic"><use href="#i-globe" /></svg><span>Tech News</span></button>
       </nav>
       <div class="sidebar-chats-section">
         <div class="sidebar-section-label flex-between"><span>Chats</span></div>
@@ -208,9 +203,15 @@
       <!-- ─── HACKATHON LAB VIEW ─── -->
       <section class="view" id="view-hackathon">
         <div class="view-header">
-          <div>
-            <div class="view-title">Hackathon Lab</div>
-            <div class="view-sub">Real hackathons &amp; internships scraped live — IT sector</div>
+          <div style="display:flex;align-items:center;gap:var(--sp-3)">
+            <button class="btn-outline back-to-cards-btn" title="Back to Cards" style="padding:6px 12px;font-size:var(--fs-xs);gap:5px">
+              <svg class="ic" style="width:14px;height:14px;transform:rotate(180deg)"><use href="#i-send" /></svg>
+              <span>Cards</span>
+            </button>
+            <div>
+              <div class="view-title">Hackathon Lab</div>
+              <div class="view-sub">Real hackathons &amp; internships scraped live — IT sector</div>
+            </div>
           </div>
           <div class="view-header-actions">
             <span class="scan-status" id="scan-status"></span>
@@ -252,9 +253,15 @@
       <!-- ─── STUDY VIEW ─── -->
       <section class="view" id="view-study">
         <div class="view-header">
-          <div>
-            <div class="view-title">Study</div>
-            <div class="view-sub">Analyze any GitHub repo or website — get AI-powered insights, architecture maps, and Q&amp;A.</div>
+          <div style="display:flex;align-items:center;gap:var(--sp-3)">
+            <button class="btn-outline back-to-cards-btn" title="Back to Cards" style="padding:6px 12px;font-size:var(--fs-xs);gap:5px">
+              <svg class="ic" style="width:14px;height:14px;transform:rotate(180deg)"><use href="#i-send" /></svg>
+              <span>Cards</span>
+            </button>
+            <div>
+              <div class="view-title">Study</div>
+              <div class="view-sub">Analyze any GitHub repo or website — get AI-powered insights, architecture maps, and Q&amp;A.</div>
+            </div>
           </div>
         </div>
         <div class="study-tabs">
@@ -297,9 +304,15 @@
       <!-- ─── RESUME AUDIT VIEW ─── -->
       <section class="view" id="view-resume">
         <div class="view-header">
-          <div>
-            <div class="view-title">Resume ATS Audit</div>
-            <div class="view-sub">Upload a resume or paste its text — a deterministic ATS score, a full breakdown, and an evidence-based AI critique.</div>
+          <div style="display:flex;align-items:center;gap:var(--sp-3)">
+            <button class="btn-outline back-to-cards-btn" title="Back to Cards" style="padding:6px 12px;font-size:var(--fs-xs);gap:5px">
+              <svg class="ic" style="width:14px;height:14px;transform:rotate(180deg)"><use href="#i-send" /></svg>
+              <span>Cards</span>
+            </button>
+            <div>
+              <div class="view-title">Resume ATS Audit</div>
+              <div class="view-sub">Upload a resume or paste its text — a deterministic ATS score, a full breakdown, and an evidence-based AI critique.</div>
+            </div>
           </div>
         </div>
         <div class="resume-panel">
@@ -325,9 +338,15 @@
       <!-- ─── OPPORTUNITY FINDER VIEW ─── -->
       <section class="view" id="view-opportunities">
         <div class="view-header">
-          <div>
-            <div class="view-title">Opportunity Finder</div>
-            <div class="view-sub">Discover internships, hackathons &amp; opportunities — curated for CSE students.</div>
+          <div style="display:flex;align-items:center;gap:var(--sp-3)">
+            <button class="btn-outline back-to-cards-btn" title="Back to Cards" style="padding:6px 12px;font-size:var(--fs-xs);gap:5px">
+              <svg class="ic" style="width:14px;height:14px;transform:rotate(180deg)"><use href="#i-send" /></svg>
+              <span>Cards</span>
+            </button>
+            <div>
+              <div class="view-title">Opportunity Finder</div>
+              <div class="view-sub">Discover internships, hackathons &amp; opportunities — curated for CSE students.</div>
+            </div>
           </div>
         </div>
         <div class="opp-toolbar" id="opp-toolbar">
@@ -346,9 +365,15 @@
       <!-- ─── TECH NEWS VIEW ─── -->
       <section class="view" id="view-news">
         <div class="view-header">
-          <div>
-            <div class="view-title">Tech News</div>
-            <div class="view-sub">Latest technology updates, AI breakthroughs &amp; developer news — updated every 30 min.</div>
+          <div style="display:flex;align-items:center;gap:var(--sp-3)">
+            <button class="btn-outline back-to-cards-btn" title="Back to Cards" style="padding:6px 12px;font-size:var(--fs-xs);gap:5px">
+              <svg class="ic" style="width:14px;height:14px;transform:rotate(180deg)"><use href="#i-send" /></svg>
+              <span>Cards</span>
+            </button>
+            <div>
+              <div class="view-title">Tech News</div>
+              <div class="view-sub">Latest technology updates, AI breakthroughs &amp; developer news — updated every 30 min.</div>
+            </div>
           </div>
         </div>
         <div class="news-toolbar" id="news-toolbar">

@@ -1518,6 +1518,9 @@ function init() {
   document.querySelectorAll('.cards-hub-card[data-view-target]').forEach((card) => {
     card.addEventListener('click', () => showView(card.dataset.viewTarget));
   });
+  document.querySelectorAll('.back-to-cards-btn').forEach((btn) => {
+    btn.addEventListener('click', () => showView('cards'));
+  });
 
   bindAttach();
   bindStudy();
