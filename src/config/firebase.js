@@ -10,6 +10,7 @@
 // ─────────────────────────────────────────────────────────
 
 const admin = require('firebase-admin');
+const { getFirestore, FieldValue: FirestoreFieldValue } = require('firebase-admin/firestore');
 const localDb = require('./db');
 
 let firebaseAdmin = null;
@@ -24,12 +25,13 @@ const hasFirebaseKeys = !!(
 
 if (hasFirebaseKeys) {
   try {
-    if (admin.apps.length > 0) {
-      firebaseAdmin = admin.app();
+    const existingApps = typeof admin.getApps === 'function' ? admin.getApps() : (admin.apps || []);
+    if (existingApps.length > 0) {
+      firebaseAdmin = existingApps[0];
     } else {
       const privateKey = (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n');
       firebaseAdmin = admin.initializeApp({
-        credential: admin.credential.cert({
+        credential: admin.cert({
           projectId: process.env.FIREBASE_PROJECT_ID,
           clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
           privateKey,
@@ -37,8 +39,8 @@ if (hasFirebaseKeys) {
       });
     }
 
-    db = firebaseAdmin.firestore();
-    FieldValue = admin.firestore.FieldValue;
+    db = getFirestore(firebaseAdmin);
+    FieldValue = FirestoreFieldValue;
     console.log(`[firebase] Connected to Cloud Firestore (project: ${process.env.FIREBASE_PROJECT_ID})`);
   } catch (err) {
     console.warn(`[firebase] Initialization error: ${err.message}. Falling back to local store.`);
