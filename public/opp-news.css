@@ -53,17 +53,19 @@
   gap: var(--sp-2);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  padding: var(--sp-4);
+  border-radius: var(--r-xl);
+  padding: var(--sp-5);
   text-decoration: none;
   color: var(--text);
-  transition: box-shadow var(--t-fast), border-color var(--t-fast), transform var(--t-fast);
+  transition: all 0.22s var(--ease-out);
   box-shadow: var(--sh-xs);
+  cursor: pointer;
+  position: relative;
 }
 .opp-card:hover {
-  border-color: rgba(var(--accent-rgb), 0.35);
-  box-shadow: var(--sh-md);
-  transform: translateY(-2px);
+  border-color: rgba(var(--accent-rgb), 0.45);
+  box-shadow: 0 12px 28px -6px rgba(var(--accent-rgb), 0.14);
+  transform: translateY(-3px);
 }
 
 .opp-card-header {
@@ -157,19 +159,22 @@
 .news-card {
   display: flex;
   align-items: flex-start;
-  gap: var(--sp-3);
+  gap: var(--sp-4);
   text-decoration: none;
   color: var(--text);
-  padding: var(--sp-3) var(--sp-4);
-  border-radius: var(--r-md);
+  padding: var(--sp-4) var(--sp-5);
+  border-radius: var(--r-xl);
   border: 1px solid var(--border);
   background: var(--surface);
-  transition: background var(--t-fast), border-color var(--t-fast), box-shadow var(--t-fast);
+  transition: all 0.2s var(--ease-out);
+  cursor: pointer;
+  box-shadow: var(--sh-xs);
 }
 .news-card:hover {
-  background: var(--surface2);
-  border-color: rgba(var(--accent-rgb), 0.25);
-  box-shadow: var(--sh-sm);
+  background: #ffffff;
+  border-color: rgba(var(--accent-rgb), 0.4);
+  box-shadow: 0 10px 24px -6px rgba(var(--accent-rgb), 0.12);
+  transform: translateY(-2px);
 }
 
 .news-num {

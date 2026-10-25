@@ -394,26 +394,26 @@ input::placeholder, textarea::placeholder { color: var(--text3); }
 /* ─── WELCOME PRODUCT CARDS ─────────────────────────── */
 .welcome-product-row {
   display: flex; flex-wrap: wrap; justify-content: center;
-  gap: var(--sp-2); margin-bottom: var(--sp-5);
+  gap: var(--sp-3); margin-bottom: var(--sp-5); max-width: 960px;
 }
 .welcome-product-card {
-  display: flex; align-items: center; gap: 10px;
-  background: var(--surface); border: 1px solid var(--border2);
-  border-radius: var(--r-lg); padding: 11px 16px;
+  display: flex; align-items: center; gap: 12px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-xl); padding: 13px 18px;
   cursor: pointer; text-align: left;
   box-shadow: var(--sh-xs);
   transition: all var(--transition);
-  min-width: 0; flex: 1; max-width: 180px;
+  min-width: 175px; flex: 1 1 175px; max-width: 210px;
 }
 .welcome-product-card:hover {
-  border-color: var(--accent); background: var(--accent-softer);
-  box-shadow: var(--sh-accent); transform: translateY(-2px);
+  border-color: var(--accent); background: #ffffff;
+  box-shadow: 0 10px 24px -6px rgba(var(--accent-rgb), 0.16); transform: translateY(-2.5px);
 }
 .welcome-product-card:active { transform: translateY(0) scale(0.97); }
-.welcome-product-icon { width: 18px; height: 18px; color: var(--accent); flex-shrink: 0; }
+.welcome-product-icon { width: 22px; height: 22px; color: var(--accent); flex-shrink: 0; }
 .welcome-product-info { min-width: 0; }
-.welcome-product-name { font-size: var(--fs-sm); font-weight: 640; color: var(--text); white-space: nowrap; }
-.welcome-product-desc { font-size: 11px; color: var(--text3); margin-top: 2px; line-height: 1.35; white-space: normal; }
+.welcome-product-name { font-size: var(--fs-sm); font-weight: 700; color: var(--text); white-space: nowrap; }
+.welcome-product-desc { font-size: 11px; color: var(--text2); margin-top: 3px; line-height: 1.35; white-space: normal; }
 
 
 @keyframes riseIn  { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }

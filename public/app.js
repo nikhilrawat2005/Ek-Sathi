@@ -120,21 +120,35 @@ function resetChatUI() {
           <svg class="ic welcome-product-icon"><use href="#i-trophy" /></svg>
           <div class="welcome-product-info">
             <div class="welcome-product-name">Hackathon Lab</div>
-            <div class="welcome-product-desc">Live hackathons &amp; internships, scraped daily</div>
+            <div class="welcome-product-desc">Live hackathons &amp; internships, curated daily</div>
           </div>
         </button>
         <button class="welcome-product-card" data-view-nav="resume">
           <svg class="ic welcome-product-icon"><use href="#i-file" /></svg>
           <div class="welcome-product-info">
-            <div class="welcome-product-name">Resume Audit</div>
-            <div class="welcome-product-desc">ATS score, full breakdown &amp; AI critique</div>
+            <div class="welcome-product-name">Resume &amp; Career</div>
+            <div class="welcome-product-desc">ATS audit &amp; personalized career roadmap</div>
           </div>
         </button>
         <button class="welcome-product-card" data-view-nav="study">
           <svg class="ic welcome-product-icon"><use href="#i-book" /></svg>
           <div class="welcome-product-info">
-            <div class="welcome-product-name">Study</div>
-            <div class="welcome-product-desc">Analyze any GitHub repo or website with AI</div>
+            <div class="welcome-product-name">Study Lab</div>
+            <div class="welcome-product-desc">Deep analyze GitHub repos &amp; live websites</div>
+          </div>
+        </button>
+        <button class="welcome-product-card" data-view-nav="opportunities">
+          <svg class="ic welcome-product-icon"><use href="#i-search" /></svg>
+          <div class="welcome-product-info">
+            <div class="welcome-product-name">Opportunity Finder</div>
+            <div class="welcome-product-desc">Top software &amp; AI internships</div>
+          </div>
+        </button>
+        <button class="welcome-product-card" data-view-nav="news">
+          <svg class="ic welcome-product-icon"><use href="#i-globe" /></svg>
+          <div class="welcome-product-info">
+            <div class="welcome-product-name">Tech News Hub</div>
+            <div class="welcome-product-desc">Live AI, dev &amp; ecosystem breakthroughs</div>
           </div>
         </button>
       </div>
