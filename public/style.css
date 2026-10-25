@@ -1074,18 +1074,21 @@ input::placeholder, textarea::placeholder { color: var(--text3); }
 /* ─── FEATURE CARDS HUB VIEW ────────────────────────── */
 .cards-view-container {
   flex: 1;
+  min-height: 0;
+  height: 100%;
   overflow-y: auto;
-  padding: var(--sp-6);
-  display: flex;
-  justify-content: center;
+  overflow-x: hidden;
+  padding: var(--sp-6) var(--sp-6) var(--sp-9);
+  display: block;
 }
 
 .cards-hub-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
   gap: var(--sp-5);
   max-width: 1100px;
   width: 100%;
+  margin: 0 auto;
   align-content: start;
 }
 
@@ -1093,15 +1096,16 @@ input::placeholder, textarea::placeholder { color: var(--text3); }
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--r-xl);
-  padding: var(--sp-6);
+  padding: 24px;
+  min-height: 220px;
   display: flex;
   flex-direction: column;
-  gap: var(--sp-3);
+  justify-content: space-between;
   box-shadow: var(--sh-xs);
   cursor: pointer;
   transition: all 0.24s var(--ease-out);
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .cards-hub-card::after {
@@ -1111,6 +1115,8 @@ input::placeholder, textarea::placeholder { color: var(--text3); }
   left: 0;
   right: 0;
   height: 3px;
+  border-top-left-radius: var(--r-xl);
+  border-top-right-radius: var(--r-xl);
   background: var(--hub-accent, var(--accent));
   opacity: 0;
   transition: opacity 0.24s var(--ease-out);
@@ -1119,38 +1125,45 @@ input::placeholder, textarea::placeholder { color: var(--text3); }
 .cards-hub-card:hover {
   transform: translateY(-4px);
   border-color: rgba(var(--accent-rgb), 0.35);
-  box-shadow: 0 16px 36px -8px rgba(37, 99, 235, 0.12);
+  box-shadow: 0 16px 36px -8px rgba(37, 99, 235, 0.14);
 }
 
 .cards-hub-card:hover::after {
   opacity: 1;
 }
 
+.cards-hub-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--sp-3);
+}
+
 .cards-hub-icon-wrap {
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   border-radius: var(--r-lg);
   background: var(--hub-bg, var(--accent-soft));
   color: var(--hub-accent, var(--accent));
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: var(--sp-1);
 }
 
 .cards-hub-icon-wrap svg.ic {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
 }
 
 .cards-hub-body {
   display: flex;
   flex-direction: column;
   flex: 1;
+  margin-bottom: var(--sp-3);
 }
 
 .cards-hub-badge {
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -1159,28 +1172,31 @@ input::placeholder, textarea::placeholder { color: var(--text3); }
 }
 
 .cards-hub-title {
-  font-size: var(--fs-lg);
+  font-size: var(--fs-md);
   font-weight: 700;
   color: var(--text);
   margin-bottom: 6px;
   letter-spacing: -0.01em;
+  line-height: 1.35;
 }
 
 .cards-hub-desc {
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   color: var(--text2);
-  line-height: 1.55;
-  margin-bottom: var(--sp-4);
-  flex: 1;
+  line-height: 1.5;
+  margin: 0;
 }
 
 .cards-hub-cta {
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   font-weight: 600;
   color: var(--accent);
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  margin-top: auto;
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--border);
   transition: transform 0.18s ease;
 }
 
