@@ -1038,3 +1038,14 @@ input::placeholder, textarea::placeholder { color: var(--text3); }
   .discover-grid { grid-template-columns: 1fr; }
   .disc-cards { grid-template-columns: 1fr !important; }
 }
+
+/* ── Resume Career Roadmap ── */
+.re-roadmap-timeline { display: flex; flex-direction: column; gap: var(--sp-4); position: relative; margin-top: var(--sp-2); }
+.re-roadmap-timeline::before { content: ''; position: absolute; left: 34px; top: 12px; bottom: 12px; width: 2px; background: var(--border); }
+.re-roadmap-step { display: flex; gap: var(--sp-4); align-items: flex-start; position: relative; z-index: 1; }
+.re-roadmap-badge { background: var(--primary); color: #fff; font-size: var(--fs-xs); font-weight: 700; padding: 4px 10px; border-radius: 9999px; flex-shrink: 0; box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3); }
+.re-roadmap-content { flex: 1; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--sp-3) var(--sp-4); }
+.re-roadmap-header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--sp-2); margin-bottom: var(--sp-2); border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+.re-roadmap-phase { font-weight: 700; font-size: var(--fs-sm); color: var(--text); }
+.re-roadmap-role { font-size: var(--fs-xs); font-weight: 600; color: var(--primary); background: rgba(79, 70, 229, 0.1); padding: 2px 8px; border-radius: var(--r-sm); }
+.re-roadmap-milestones { margin: 0; padding-left: 20px; font-size: var(--fs-xs); color: var(--text-2); display: flex; flex-direction: column; gap: 4px; }

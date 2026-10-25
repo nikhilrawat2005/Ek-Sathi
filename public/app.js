@@ -1193,7 +1193,28 @@ function renderResumeAudit(data) {
     <div class="re-card">
       <div class="re-card-title">Action Plan</div>
       <ol class="re-plan">${(a.actionPlan || []).slice(0, 4).map((s) => `<li>${escHtml(s)}</li>`).join('') || ''}</ol>
-    </div>`;
+    </div>
+
+    ${(a.careerRoadmap || []).length ? `
+    <div class="re-card">
+      <div class="re-card-title">Personalized Career Roadmap</div>
+      <div class="re-roadmap-timeline">
+        ${a.careerRoadmap.map((step, idx) => `
+          <div class="re-roadmap-step">
+            <div class="re-roadmap-badge">Phase ${idx + 1}</div>
+            <div class="re-roadmap-content">
+              <div class="re-roadmap-header">
+                <span class="re-roadmap-phase">${escHtml(step.phase || '')}</span>
+                <span class="re-roadmap-role">🎯 ${escHtml(step.targetRole || '')}</span>
+              </div>
+              <ul class="re-roadmap-milestones">
+                ${(step.milestones || []).map(m => `<li>${escHtml(m)}</li>`).join('')}
+              </ul>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>` : ''}`;
   res.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 

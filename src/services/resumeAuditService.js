@@ -398,6 +398,35 @@ function fallbackCritique({ atsScore, verdict, breakdown, heuristics, bullets, c
       !heuristics.hasEmail ? 'Add email + phone + location at the top.' : 'Verify the contact section.',
       'Keep it to one page with consistent formatting and standard section headers.',
     ],
+    careerRoadmap: [
+      {
+        phase: 'Immediate Foundation (0 - 3 Months)',
+        targetRole: 'SWE Intern / Junior Developer',
+        milestones: [
+          'Address ATS formatting and quantify project metrics in portfolio.',
+          'Consolidate core DSA (Arrays, Strings, Trees, Graphs) and Git workflows.',
+          'Deploy 1 end-to-end fullstack capstone with live URL & CI/CD.'
+        ]
+      },
+      {
+        phase: 'Growth & Skill Expansion (3 - 6 Months)',
+        targetRole: 'Full Stack / AI-Assisted Engineer',
+        milestones: [
+          'Participate in 2 national/global hackathons (Devpost / Devfolio).',
+          'Integrate cloud services (Firebase / Supabase, Serverless APIs, Caching).',
+          'Contribute to open-source repositories and enhance system design basics.'
+        ]
+      },
+      {
+        phase: 'Placement & Industry Ready (6 - 12 Months)',
+        targetRole: 'Software Development Engineer (SDE-1)',
+        milestones: [
+          'Master mock interviews (Behavioral + Core CS subjects: OS, DBMS, Networks).',
+          'Tailor resume per job description with verified metrics and high ATS keywords.',
+          'Target on-campus placements, referrals, and top-tier product internships.'
+        ]
+      }
+    ],
     sectionReview: sec,
     grades: {
       impactAndMetrics: gradeOf(breakdown.impactAndMetrics),
@@ -422,9 +451,16 @@ async function critiqueResume({ resumeText, targetJobDescription, atsScore, brea
  "missingRecommendedKeywords": ["only if a target JD was given; keywords from JD missing in text; else []"],
  "bulletImprovements": [{"original": "exact bullet copied verbatim from resume", "improved": "rewritten with strong verb + metric + result"}],
  "actionPlan": ["4 numbered, concrete steps"],
+ "careerRoadmap": [
+   {
+     "phase": "Phase title with timeline (e.g. 0-3 Months)",
+     "targetRole": "Role title",
+     "milestones": ["concrete milestone 1", "concrete milestone 2", "concrete milestone 3"]
+   }
+ ],
  "sectionReview": [{"section":"SectionName","verdict":"strong|ok|weak","whatWorks":["..."],"whatToImprove":["..."]}]
 }
-Constraints: bulletImprovements MUST reference existing bullets; max 6 sectionReview entries; keep JSON valid (escape quotes).`;
+Constraints: bulletImprovements MUST reference existing bullets; max 6 sectionReview entries; careerRoadmap MUST contain exactly 3 progressive phases tailored to the candidate's current background and target; keep JSON valid (escape quotes).`;
   const usr = [
     `Today's date: ${new Date().toISOString().slice(0, 10)}. Judge the resume as of this date (treat "present" roles accordingly).`,
     `ATS score (deterministic, machine-computed): ${atsScore}/100 — verdict: ${verdict}.`,
@@ -468,6 +504,27 @@ Constraints: bulletImprovements MUST reference existing bullets; max 6 sectionRe
     missingRecommendedKeywords: Array.isArray(parsed.missingRecommendedKeywords) ? parsed.missingRecommendedKeywords.slice(0, 15).map(String).filter((k) => (targetJobDescription && !kwPattern(k).test(resumeText))).filter(Boolean) : [],
     bulletImprovements: Array.isArray(parsed.bulletImprovements) ? parsed.bulletImprovements.slice(0, 4).map((b) => ({ original: String(b.original || ''), improved: stripTrailPeriod(String(b.improved || '')) })).filter((b) => b.original && b.improved) : [],
     actionPlan: Array.isArray(parsed.actionPlan) ? parsed.actionPlan.slice(0, 6).map(String) : [],
+    careerRoadmap: Array.isArray(parsed.careerRoadmap) ? parsed.careerRoadmap.slice(0, 4).map((r) => ({
+      phase: String(r.phase || ''),
+      targetRole: String(r.targetRole || ''),
+      milestones: Array.isArray(r.milestones) ? r.milestones.map(String) : [],
+    })) : [
+      {
+        phase: 'Phase 1: Foundation (0 - 3 Months)',
+        targetRole: 'Junior Developer / SWE Intern',
+        milestones: ['Refine portfolio projects with measurable metrics', 'Strengthen Data Structures and core CS basics', 'Prepare tailored resumes for internships']
+      },
+      {
+        phase: 'Phase 2: Growth (3 - 6 Months)',
+        targetRole: 'Full Stack Engineer',
+        milestones: ['Ship collaborative fullstack projects', 'Compete in hackathons and build in public', 'Develop system design intuition']
+      },
+      {
+        phase: 'Phase 3: Career Ready (6 - 12 Months)',
+        targetRole: 'Software Engineer (SDE-1)',
+        milestones: ['Crack mock interviews and behavioral rounds', 'Target off-campus and placement opportunities', 'Secure production role']
+      }
+    ],
     sectionReview: Array.isArray(parsed.sectionReview) ? parsed.sectionReview.slice(0, 6).map((s) => ({
       section: String(s.section || ''),
       verdict: ['strong', 'ok', 'weak'].includes(String(s.verdict || '')) ? String(s.verdict) : 'ok',
@@ -719,6 +776,22 @@ function buildAuditReportPdf(audit, resumeName = 'resume') {
       y += 14;
       ensure(14);
       doc.font('Helvetica').fontSize(8.5).fillColor('#374151').text(audit.actionPlan.map((a, i) => `${i + 1}. ${a}`).join('\n'), 44, y, { width: W, lineGap: 3 });
+      y = doc.y + 8;
+    }
+
+    if (audit.careerRoadmap && audit.careerRoadmap.length) {
+      ensure(20);
+      doc.font('Helvetica-Bold').fontSize(11).fillColor('#4f46e5').text('Personalized Career Roadmap', 44, y, { width: W });
+      y += 16;
+      for (const step of audit.careerRoadmap) {
+        ensure(24);
+        doc.font('Helvetica-Bold').fontSize(9).fillColor('#1e1b4b').text(`• ${step.phase} — Target: ${step.targetRole}`, 44, y, { width: W });
+        y = doc.y + 3;
+        ensure(16);
+        const ms = (step.milestones || []).map((m) => `   - ${m}`).join('\n');
+        doc.font('Helvetica').fontSize(8).fillColor('#4b5563').text(ms, 44, y, { width: W, lineGap: 2 });
+        y = doc.y + 6;
+      }
     }
 
     doc.end();
