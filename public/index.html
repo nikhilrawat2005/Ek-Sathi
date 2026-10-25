@@ -49,6 +49,7 @@
       <button class="btn-new-chat" id="new-chat-btn"><svg class="ic"><use href="#i-spark" /></svg>New Chat</button>
       <nav class="sidebar-nav">
         <button class="nav-btn active" data-view="chat"><svg class="ic"><use href="#i-chat" /></svg><span>Chat</span></button>
+        <button class="nav-btn" data-view="cards"><svg class="ic"><use href="#i-box" /></svg><span>Cards</span></button>
         <button class="nav-btn" data-view="hackathon"><svg class="ic"><use href="#i-trophy" /></svg><span>Hackathon Lab</span></button>
         <button class="nav-btn" data-view="study"><svg class="ic"><use href="#i-book" /></svg><span>Study</span></button>
         <button class="nav-btn" data-view="resume"><svg class="ic"><use href="#i-file" /></svg><span>Resume Audit</span></button>
@@ -83,6 +84,10 @@
             <div class="view-title" id="chat-session-title">New Chat</div>
           </div>
           <div class="view-header-actions">
+            <button class="btn-outline" id="chat-cards-btn" title="Feature Cards" style="padding: 6px 12px; font-size: var(--fs-xs); gap: 5px;">
+              <svg class="ic" style="width: 14px; height: 14px;"><use href="#i-box" /></svg>
+              <span>Feature Cards</span>
+            </button>
             <select class="model-select" id="model-selector" title="Preferred model">
               <option value="">Auto (Smart)</option>
               <option value="google/gemini-2.5-flash-lite">Gemini Flash Lite</option>
@@ -105,6 +110,97 @@
             <button class="send-btn" id="send-btn" title="Send" aria-label="Send message">
               <svg class="ic"><use href="#i-send" /></svg>
             </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─── CARDS VIEW ─── -->
+      <section class="view" id="view-cards">
+        <div class="view-header">
+          <div style="display:flex;align-items:center;gap:var(--sp-3)">
+            <button class="btn-outline" id="cards-back-btn" title="Back to Chat" style="padding:6px 12px;font-size:var(--fs-xs);gap:5px">
+              <svg class="ic" style="width:14px;height:14px;transform:rotate(180deg)"><use href="#i-send" /></svg>
+              <span>Back to Chat</span>
+            </button>
+            <div>
+              <div class="view-title">Feature Cards</div>
+              <div class="view-sub">Explore all core Ek Sathi modules &amp; student capabilities</div>
+            </div>
+          </div>
+        </div>
+        <div class="cards-view-container">
+          <div class="cards-hub-grid">
+            <div class="cards-hub-card" data-view-target="chat">
+              <div class="cards-hub-icon-wrap" style="--hub-accent:#2563eb;--hub-bg:rgba(37,99,235,0.08)">
+                <svg class="ic"><use href="#i-chat" /></svg>
+              </div>
+              <div class="cards-hub-body">
+                <div class="cards-hub-badge">AI Assistant</div>
+                <h3 class="cards-hub-title">Central AI Chat</h3>
+                <p class="cards-hub-desc">Ask queries, debug complex algorithms, get explanations with long-term student memory &amp; document parsing.</p>
+                <div class="cards-hub-cta">Open Chat &rarr;</div>
+              </div>
+            </div>
+
+            <div class="cards-hub-card" data-view-target="hackathon">
+              <div class="cards-hub-icon-wrap" style="--hub-accent:#d97706;--hub-bg:rgba(217,119,6,0.08)">
+                <svg class="ic"><use href="#i-trophy" /></svg>
+              </div>
+              <div class="cards-hub-body">
+                <div class="cards-hub-badge">Builder Lab</div>
+                <h3 class="cards-hub-title">Hackathon Lab</h3>
+                <p class="cards-hub-desc">Curated hackathons across Devpost, Unstop &amp; Devfolio. Idea generator, project roadmaps, and pitch deck guides.</p>
+                <div class="cards-hub-cta">Explore Hackathons &rarr;</div>
+              </div>
+            </div>
+
+            <div class="cards-hub-card" data-view-target="resume">
+              <div class="cards-hub-icon-wrap" style="--hub-accent:#16a34a;--hub-bg:rgba(22,163,74,0.08)">
+                <svg class="ic"><use href="#i-file" /></svg>
+              </div>
+              <div class="cards-hub-body">
+                <div class="cards-hub-badge">Career &amp; Growth</div>
+                <h3 class="cards-hub-title">Resume &amp; Career Roadmap</h3>
+                <p class="cards-hub-desc">ATS-level scoring, bullet improvements, metric checks, and a personalized 3-phase career timeline with PDF export.</p>
+                <div class="cards-hub-cta">Audit Resume &rarr;</div>
+              </div>
+            </div>
+
+            <div class="cards-hub-card" data-view-target="study">
+              <div class="cards-hub-icon-wrap" style="--hub-accent:#8b5cf6;--hub-bg:rgba(139,92,246,0.08)">
+                <svg class="ic"><use href="#i-book" /></svg>
+              </div>
+              <div class="cards-hub-body">
+                <div class="cards-hub-badge">Deep Analysis</div>
+                <h3 class="cards-hub-title">GitHub &amp; Website Study</h3>
+                <p class="cards-hub-desc">Decode any GitHub repository architecture, analyze web structures, and run interactive Q&amp;A sessions on codebases.</p>
+                <div class="cards-hub-cta">Start Study &rarr;</div>
+              </div>
+            </div>
+
+            <div class="cards-hub-card" data-view-target="opportunities">
+              <div class="cards-hub-icon-wrap" style="--hub-accent:#0ea5e9;--hub-bg:rgba(14,165,233,0.08)">
+                <svg class="ic"><use href="#i-search" /></svg>
+              </div>
+              <div class="cards-hub-body">
+                <div class="cards-hub-badge">Job Board</div>
+                <h3 class="cards-hub-title">Opportunity Finder</h3>
+                <p class="cards-hub-desc">Direct internships &amp; software developer openings filtered for college students across LinkedIn, Internshala and portals.</p>
+                <div class="cards-hub-cta">Find Internships &rarr;</div>
+              </div>
+            </div>
+
+            <div class="cards-hub-card" data-view-target="news">
+              <div class="cards-hub-icon-wrap" style="--hub-accent:#f43f5e;--hub-bg:rgba(244,63,94,0.08)">
+                <svg class="ic"><use href="#i-globe" /></svg>
+              </div>
+              <div class="cards-hub-body">
+                <div class="cards-hub-badge">Ecosystem Feed</div>
+                <h3 class="cards-hub-title">Tech News Hub</h3>
+                <p class="cards-hub-desc">Live technology updates, AI model releases, and dev community insights with curated short overviews and timestamps.</p>
+                <div class="cards-hub-cta">Read Tech News &rarr;</div>
+              </div>
+            </div>
           </div>
         </div>
       </section>

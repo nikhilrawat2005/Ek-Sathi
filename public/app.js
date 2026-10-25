@@ -115,44 +115,6 @@ function resetChatUI() {
       <h1 class="welcome-title">Hi, I'm Ek Sathi</h1>
       <p class="welcome-sub">Your AI Companion for Learning &amp; Growth</p>
 
-      <div class="welcome-product-row">
-        <button class="welcome-product-card" data-view-nav="hackathon">
-          <svg class="ic welcome-product-icon"><use href="#i-trophy" /></svg>
-          <div class="welcome-product-info">
-            <div class="welcome-product-name">Hackathon Lab</div>
-            <div class="welcome-product-desc">Live hackathons &amp; internships, curated daily</div>
-          </div>
-        </button>
-        <button class="welcome-product-card" data-view-nav="resume">
-          <svg class="ic welcome-product-icon"><use href="#i-file" /></svg>
-          <div class="welcome-product-info">
-            <div class="welcome-product-name">Resume &amp; Career</div>
-            <div class="welcome-product-desc">ATS audit &amp; personalized career roadmap</div>
-          </div>
-        </button>
-        <button class="welcome-product-card" data-view-nav="study">
-          <svg class="ic welcome-product-icon"><use href="#i-book" /></svg>
-          <div class="welcome-product-info">
-            <div class="welcome-product-name">Study Lab</div>
-            <div class="welcome-product-desc">Deep analyze GitHub repos &amp; live websites</div>
-          </div>
-        </button>
-        <button class="welcome-product-card" data-view-nav="opportunities">
-          <svg class="ic welcome-product-icon"><use href="#i-search" /></svg>
-          <div class="welcome-product-info">
-            <div class="welcome-product-name">Opportunity Finder</div>
-            <div class="welcome-product-desc">Top software &amp; AI internships</div>
-          </div>
-        </button>
-        <button class="welcome-product-card" data-view-nav="news">
-          <svg class="ic welcome-product-icon"><use href="#i-globe" /></svg>
-          <div class="welcome-product-info">
-            <div class="welcome-product-name">Tech News Hub</div>
-            <div class="welcome-product-desc">Live AI, dev &amp; ecosystem breakthroughs</div>
-          </div>
-        </button>
-      </div>
-
       <div class="welcome-suggestions">
         <button class="welcome-chip">Explain a coding concept</button>
         <button class="welcome-chip">Help me debug this code</button>
@@ -162,10 +124,6 @@ function resetChatUI() {
     </div>`;
   $('messages-container').innerHTML = welcome;
   bindWelcomeChips();
-  // Bind product card nav buttons
-  document.querySelectorAll('.welcome-product-card[data-view-nav]').forEach((btn) => {
-    btn.addEventListener('click', () => showView(btn.dataset.viewNav));
-  });
 }
 
 
@@ -1550,6 +1508,15 @@ function init() {
   }
   $('logout-btn').addEventListener('click', () => {
     if (confirm('Clear local preferences and reload?')) { localStorage.clear(); location.reload(); }
+  });
+
+  // Cards view triggers
+  const cardsHeaderBtn = $('chat-cards-btn');
+  if (cardsHeaderBtn) cardsHeaderBtn.addEventListener('click', () => showView('cards'));
+  const cardsBackBtn = $('cards-back-btn');
+  if (cardsBackBtn) cardsBackBtn.addEventListener('click', () => showView('chat'));
+  document.querySelectorAll('.cards-hub-card[data-view-target]').forEach((card) => {
+    card.addEventListener('click', () => showView(card.dataset.viewTarget));
   });
 
   bindAttach();
