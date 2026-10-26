@@ -3,6 +3,7 @@ const multer = require('multer');
 const router = express.Router();
 const { requireAuth } = require('../middleware/auth');
 const { auditResume, auditResumeBuffer, buildAuditReportPdf } = require('../services/resumeAuditService');
+const fileService = require('../services/fileService');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 15 * 1024 * 1024 } });
 
@@ -12,8 +13,30 @@ router.post('/audit', requireAuth, upload.single('file'), async (req, res) => {
   try {
     const jd = String(req.body && (req.body.targetJobDescription || req.body.jd || '')).trim();
     if (req.file) {
+      // 1. Audit the resume buffer for instant ATS feedback
       const { audit, fileName, charCount, pageCount } = await auditResumeBuffer(req.file.buffer, req.file.originalname, jd);
-      return res.json({ status: 'ok', audit, fileName, charCount, pageCount, source: 'file' });
+
+      // 2. Persist resume file to Cloudinary & Firestore with SHA-256 deduplication
+      let savedRecord = null;
+      if (!req.isGuest && req.userId) {
+        try {
+          savedRecord = await fileService.uploadFile(req.userId, req.file);
+        } catch (fErr) {
+          console.warn('[resume] Cloudinary/Firestore save notice:', fErr.message);
+        }
+      }
+
+      return res.json({
+        status: 'ok',
+        audit,
+        fileName,
+        charCount,
+        pageCount,
+        source: 'file',
+        fileUrl: savedRecord?.url || null,
+        fileId: savedRecord?.id || null,
+        deduplicated: !!savedRecord?.deduplicated,
+      });
     }
     const text = String((req.body && (req.body.text || req.body.resumeText)) || '').trim();
     if (!text) return res.status(400).json({ error: 'Koi file ya resume text nahi mila — PDF/DOCX upload karo ya text paste karo.' });
