@@ -10,38 +10,222 @@ const API = (typeof window !== 'undefined' && window.location && window.location
   ? window.location.origin
   : '';
 
-/* ── User & Multi-tenant State ──────────────────────────── */
-function getActiveUserEmail() {
-  let email = localStorage.getItem('eksathi_user_email');
-  if (!email || !email.includes('@')) {
-    email = 'student@eksathi.ai';
-    localStorage.setItem('eksathi_user_email', email);
-  }
-  return email.toLowerCase().trim();
+/* ── User & Firebase Authentication State ────────────────── */
+let currentAuthUser = null;
+let currentIdToken = null;
+let isFirebaseAuthReady = false;
+let authModalMode = 'login'; // 'login' | 'signup'
+
+// Ephemeral in-memory chat storage for Guest / Non-signed-in users
+// When the tab is closed, this RAM variable is wiped cleanly.
+let guestChatMessages = [];
+
+function isUserSignedIn() {
+  return !!(currentAuthUser && currentAuthUser.email);
 }
 
-function setActiveUserEmail(email) {
-  if (email && email.includes('@')) {
-    localStorage.setItem('eksathi_user_email', email.toLowerCase().trim());
-    updateUserDisplay();
-    resetChatUI();
-    loadSessions();
-    renderStudyHistory();
-    if ($('view-hackathon').classList.contains('active')) loadDiscoverCards();
-    if ($('view-memory-hub').classList.contains('active')) loadMemoryHub();
+function getActiveUserEmail() {
+  if (currentAuthUser && currentAuthUser.email) {
+    return currentAuthUser.email.toLowerCase().trim();
   }
+  return 'guest@eksathi.local';
 }
 
 function updateUserDisplay() {
-  const email = getActiveUserEmail();
-  const namePart = email.split('@')[0];
-  const char = (namePart[0] || 'U').toUpperCase();
+  const signedIn = isUserSignedIn();
   const avatarChar = $('user-avatar-char');
-  if (avatarChar) avatarChar.textContent = char;
   const nameEl = $('user-display-name');
-  if (nameEl) nameEl.textContent = namePart.replace(/[._-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   const emailEl = $('user-display-email');
-  if (emailEl) emailEl.textContent = email;
+  const chatTag = $('chat-mode-tag');
+  const navLock = $('nav-cards-lock-badge');
+  const headerLock = $('chat-cards-lock-badge');
+  const headerSignInBtn = $('header-signin-btn');
+  const authIcon = $('auth-action-icon');
+  const authActionBtn = $('auth-action-btn');
+  const cardsGate = $('cards-auth-gate');
+  const cardsGrid = $('cards-hub-grid');
+
+  if (signedIn) {
+    const email = getActiveUserEmail();
+    const namePart = (currentAuthUser.displayName || email.split('@')[0]);
+    const char = (namePart[0] || 'U').toUpperCase();
+    if (avatarChar) avatarChar.textContent = char;
+    if (nameEl) nameEl.textContent = namePart.replace(/[._-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    if (emailEl) emailEl.textContent = email;
+    if (chatTag) {
+      chatTag.textContent = 'Saved (Cloud)';
+      chatTag.classList.add('signed-in');
+    }
+    if (navLock) navLock.style.display = 'none';
+    if (headerLock) headerLock.style.display = 'none';
+    if (headerSignInBtn) headerSignInBtn.style.display = 'none';
+    if (authActionBtn) authActionBtn.title = 'Sign Out';
+    if (authIcon) authIcon.innerHTML = '<use href="#i-logout" />';
+    if (cardsGate) cardsGate.style.display = 'none';
+    if (cardsGrid) cardsGrid.style.display = 'grid';
+  } else {
+    if (avatarChar) avatarChar.textContent = 'G';
+    if (nameEl) nameEl.textContent = 'Guest Student';
+    if (emailEl) emailEl.textContent = 'Temporary tab memory';
+    if (chatTag) {
+      chatTag.textContent = 'Tab Memory (No Save)';
+      chatTag.classList.remove('signed-in');
+    }
+    if (navLock) navLock.style.display = 'inline-flex';
+    if (headerLock) headerLock.style.display = 'inline-flex';
+    if (headerSignInBtn) headerSignInBtn.style.display = 'inline-flex';
+    if (authActionBtn) authActionBtn.title = 'Sign In';
+    if (authIcon) authIcon.innerHTML = '<use href="#i-user" />';
+    if (cardsGate) cardsGate.style.display = 'flex';
+    if (cardsGrid) cardsGrid.style.display = 'none';
+  }
+}
+
+/* ── Firebase Client SDK Initialization ────────────────── */
+async function initFirebaseClient() {
+  try {
+    const res = await fetch(API + '/api/auth/config');
+    const cfg = await res.json();
+    if (cfg && cfg.apiKey && typeof firebase !== 'undefined') {
+      if (!firebase.apps.length) {
+        firebase.initializeApp(cfg);
+      }
+      firebase.auth().onAuthStateChanged(async (user) => {
+        currentAuthUser = user;
+        if (user) {
+          try {
+            currentIdToken = await user.getIdToken();
+          } catch (_) {}
+          updateUserDisplay();
+          loadSessions();
+          renderStudyHistory();
+        } else {
+          currentIdToken = null;
+          updateUserDisplay();
+          sessions = [];
+          renderSessions();
+          resetChatUI();
+        }
+      });
+      isFirebaseAuthReady = true;
+    }
+  } catch (err) {
+    console.warn('[auth] Firebase client config notice:', err.message);
+  }
+}
+
+/* ── Auth Modal Functions ──────────────────────────────── */
+function openAuthModal(mode = 'login') {
+  authModalMode = mode;
+  const overlay = $('auth-modal-overlay');
+  const title = $('auth-modal-title');
+  const submitBtn = $('auth-submit-btn');
+  const toggleText = $('auth-toggle-text');
+  const toggleBtn = $('auth-toggle-btn');
+  const errBox = $('auth-error-msg');
+  if (errBox) errBox.style.display = 'none';
+
+  if (mode === 'signup') {
+    if (title) title.textContent = 'Create Student Account';
+    if (submitBtn) submitBtn.querySelector('span').textContent = 'Create Account';
+    if (toggleText) toggleText.textContent = 'Already have an account?';
+    if (toggleBtn) toggleBtn.textContent = 'Sign In';
+  } else {
+    if (title) title.textContent = 'Student Sign In';
+    if (submitBtn) submitBtn.querySelector('span').textContent = 'Sign In';
+    if (toggleText) toggleText.textContent = "Don't have an account yet?";
+    if (toggleBtn) toggleBtn.textContent = 'Create one';
+  }
+  if (overlay) overlay.style.display = 'flex';
+}
+
+function closeAuthModal() {
+  const overlay = $('auth-modal-overlay');
+  if (overlay) overlay.style.display = 'none';
+  const errBox = $('auth-error-msg');
+  if (errBox) errBox.style.display = 'none';
+}
+
+function setAuthError(msg) {
+  const errBox = $('auth-error-msg');
+  if (!errBox) return;
+  if (!msg) {
+    errBox.style.display = 'none';
+    errBox.textContent = '';
+  } else {
+    errBox.style.display = 'block';
+    errBox.textContent = msg;
+  }
+}
+
+async function handleGoogleSignIn() {
+  try {
+    setAuthError('');
+    if (!firebase || !firebase.auth) throw new Error('Firebase Auth is initializing. Please wait a moment.');
+    const provider = new firebase.auth.GoogleAuthProvider();
+    await firebase.auth().signInWithPopup(provider);
+    closeAuthModal();
+  } catch (err) {
+    setAuthError(err.message || 'Failed to sign in with Google');
+  }
+}
+
+async function handleEmailPasswordAuth() {
+  const emailInput = $('auth-email');
+  const passInput = $('auth-password');
+  const email = (emailInput?.value || '').trim();
+  const password = (passInput?.value || '').trim();
+
+  if (!email || !email.includes('@')) {
+    setAuthError('Please enter a valid student email address');
+    return;
+  }
+  if (!password || password.length < 6) {
+    setAuthError('Password must be at least 6 characters long');
+    return;
+  }
+
+  setAuthError('');
+  const submitBtn = $('auth-submit-btn');
+  if (submitBtn) submitBtn.disabled = true;
+
+  try {
+    if (!firebase || !firebase.auth) throw new Error('Firebase Auth not ready');
+    if (authModalMode === 'signup') {
+      await firebase.auth().createUserWithEmailAndPassword(email, password);
+    } else {
+      await firebase.auth().signInWithEmailAndPassword(email, password);
+    }
+    closeAuthModal();
+  } catch (err) {
+    let msg = err.message || 'Authentication error';
+    if (err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+      msg = 'Invalid email or password.';
+    } else if (err.code === 'auth/email-already-in-use') {
+      msg = 'This email already has an account. Please sign in instead.';
+    }
+    setAuthError(msg);
+  } finally {
+    if (submitBtn) submitBtn.disabled = false;
+  }
+}
+
+async function handleSignOut() {
+  if (confirm('Are you sure you want to sign out? You will return to guest mode.')) {
+    try {
+      if (firebase && firebase.auth) {
+        await firebase.auth().signOut();
+      }
+    } catch (_) {}
+    currentAuthUser = null;
+    currentIdToken = null;
+    guestChatMessages = [];
+    updateUserDisplay();
+    sessions = [];
+    renderSessions();
+    resetChatUI();
+    showView('chat');
+  }
 }
 
 /* ── State ─────────────────────────────────────────────── */
@@ -56,9 +240,23 @@ const escHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;
 /* ── API helpers ───────────────────────────────────────── */
 async function apiFetch(url, opts = {}) {
   const email = getActiveUserEmail();
+  const signedIn = isUserSignedIn();
+
+  // Try to refresh token if available
+  if (signedIn && currentAuthUser) {
+    try {
+      currentIdToken = await currentAuthUser.getIdToken();
+    } catch (_) {}
+  }
+
+  const authHeaderVal = (signedIn && currentIdToken)
+    ? `Bearer ${currentIdToken}`
+    : (signedIn ? `Bearer email:${email}` : 'Bearer guest-anonymous');
+
   const headers = {
-    'Authorization': `Bearer email:${email}`,
-    'x-user-email': email,
+    'Authorization': authHeaderVal,
+    'x-user-email': signedIn ? email : '',
+    'x-is-guest': signedIn ? 'false' : 'true',
     ...(opts.headers || {})
   };
   let res;
@@ -75,6 +273,15 @@ async function apiFetch(url, opts = {}) {
 
 /* ── Navigation ────────────────────────────────────────── */
 function showView(view) {
+  // Gate check: If user attempts to open 'cards' or any submodule while NOT signed in,
+  // show the auth gate / request sign in unless staying on chat
+  if (view !== 'chat' && !isUserSignedIn()) {
+    document.querySelectorAll('.view').forEach((v) => v.classList.toggle('active', v.id === 'view-cards'));
+    document.querySelectorAll('.nav-btn').forEach((b) => b.classList.toggle('active', b.dataset.view === 'cards'));
+    updateUserDisplay();
+    return;
+  }
+
   document.querySelectorAll('.view').forEach((v) => v.classList.toggle('active', v.id === `view-${view}`));
   document.querySelectorAll('.nav-btn').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
   if (view === 'hackathon') loadDiscoverCards();
@@ -86,6 +293,11 @@ function showView(view) {
 
 /* ── Sessions ──────────────────────────────────────────── */
 async function loadSessions() {
+  if (!isUserSignedIn()) {
+    sessions = [];
+    renderSessions();
+    return;
+  }
   try {
     const data = await apiFetch('/api/sessions');
     sessions = data.sessions || [];
@@ -95,6 +307,12 @@ async function loadSessions() {
 
 function renderSessions() {
   const list = $('sessions-list');
+  if (!isUserSignedIn()) {
+    list.innerHTML = '<div class="sessions-empty" style="font-size:11px;line-height:1.4">Guest session: in-memory tab chat active.<br><a href="#" id="sessions-signin-link" style="color:var(--accent);text-decoration:underline">Sign in</a> to save history.</div>';
+    const link = $('sessions-signin-link');
+    if (link) link.addEventListener('click', (e) => { e.preventDefault(); openAuthModal('login'); });
+    return;
+  }
   if (!sessions.length) {
     list.innerHTML = '<div class="sessions-empty">No chats yet</div>';
     return;
@@ -125,6 +343,10 @@ function renderSessions() {
 }
 
 async function createSession() {
+  if (!isUserSignedIn()) {
+    currentSessionId = 'ephemeral';
+    return 'ephemeral';
+  }
   const data = await apiFetch('/api/sessions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
   sessions.unshift(data.session);
   renderSessions();
@@ -148,12 +370,15 @@ async function switchSession(id) {
 
 function resetChatUI() {
   currentSessionId = null;
+  if (!isUserSignedIn()) {
+    guestChatMessages = [];
+  }
   $('chat-session-title').textContent = 'New Chat';
   const welcome = `
     <div id="welcome-screen" class="welcome-screen">
       <div class="welcome-orb"><svg class="ic"><use href="#i-spark" /></svg></div>
       <h1 class="welcome-title">Hi, I'm Ek Sathi</h1>
-      <p class="welcome-sub">Your AI Companion for Learning &amp; Growth</p>
+      <p class="welcome-sub">${isUserSignedIn() ? 'Your Personal AI Companion for Learning &amp; Growth' : 'Free AI Chat · In-memory temporary session'}</p>
 
       <div class="welcome-suggestions">
         <button class="welcome-chip">Explain a coding concept</button>
@@ -317,6 +542,13 @@ async function sendMessage() {
   if (!currentSessionId) currentSessionId = await createSession();
   const docs = attachedFiles.map((f) => ({ id: f.id, name: f.name }));
   appendMessage('user', text);
+
+  // In guest mode, append to in-memory context
+  const isGuest = !isUserSignedIn();
+  if (isGuest) {
+    guestChatMessages.push({ role: 'user', content: text });
+  }
+
   clearAttachments();
   const typing = addTyping();
   try {
@@ -324,16 +556,27 @@ async function sendMessage() {
     const data = await apiFetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId: currentSessionId, message: text, model, documents: docs.length ? docs : undefined }),
+      body: JSON.stringify({
+        sessionId: currentSessionId,
+        message: text,
+        model,
+        documents: docs.length ? docs : undefined,
+        isEphemeral: isGuest,
+        chatHistory: isGuest ? guestChatMessages.slice(-12) : undefined,
+      }),
     });
     typing.remove();
-    if (data.updatedTitle) {
+    const replyText = data.reply || '…';
+    if (isGuest) {
+      guestChatMessages.push({ role: 'assistant', content: replyText });
+    }
+    if (data.updatedTitle && !isGuest) {
       $('chat-session-title').textContent = data.updatedTitle;
       const s = sessions.find((x) => x.id === currentSessionId);
       if (s) s.title = data.updatedTitle;
       renderSessions();
     }
-    appendMessage('assistant', data.reply || '…');
+    appendMessage('assistant', replyText);
   } catch (err) {
     typing.remove();
     appendMessage('assistant', err.message || 'Something went wrong.');
@@ -1567,22 +1810,51 @@ function init() {
     document.querySelectorAll('.nav-btn').forEach((b) => b.addEventListener('click', closeSide));
   }
 
-  // Account switch modal / prompt
-  const handleSwitchAccount = () => {
-    const cur = getActiveUserEmail();
-    const entered = prompt('Enter student email address to load personal workspace & saved hackathons:\n(e.g. nikhil@gmail.com, student@college.edu)', cur);
-    if (entered && entered.trim() && entered.includes('@')) {
-      setActiveUserEmail(entered.trim());
-      alert(`Switched to student workspace: ${entered.trim()}`);
+  // Authentication bindings
+  const authActionBtn = $('auth-action-btn');
+  const userProfileRow = $('user-profile-row');
+  const headerSignInBtn = $('header-signin-btn');
+  const gateSignInBtn = $('gate-signin-btn');
+  const gateBackChatBtn = $('gate-back-chat-btn');
+  const authModalClose = $('auth-modal-close');
+  const authModalOverlay = $('auth-modal-overlay');
+  const authGoogleBtn = $('auth-google-btn');
+  const authForm = $('auth-form');
+  const authToggleBtn = $('auth-toggle-btn');
+
+  const onAuthTrigger = (e) => {
+    if (e) e.stopPropagation();
+    if (isUserSignedIn()) {
+      handleSignOut();
+    } else {
+      openAuthModal('login');
     }
   };
 
-  const switchBtn = $('switch-account-btn');
-  if (switchBtn) switchBtn.addEventListener('click', (e) => { e.stopPropagation(); handleSwitchAccount(); });
-  const profileRow = $('user-profile-row');
-  if (profileRow) profileRow.addEventListener('click', handleSwitchAccount);
+  if (authActionBtn) authActionBtn.addEventListener('click', onAuthTrigger);
+  if (userProfileRow) userProfileRow.addEventListener('click', onAuthTrigger);
+  if (headerSignInBtn) headerSignInBtn.addEventListener('click', () => openAuthModal('login'));
+  if (gateSignInBtn) gateSignInBtn.addEventListener('click', () => openAuthModal('login'));
+  if (gateBackChatBtn) gateBackChatBtn.addEventListener('click', () => showView('chat'));
 
-  updateUserDisplay();
+  if (authModalClose) authModalClose.addEventListener('click', closeAuthModal);
+  if (authModalOverlay) {
+    authModalOverlay.addEventListener('click', (e) => {
+      if (e.target === authModalOverlay) closeAuthModal();
+    });
+  }
+
+  if (authGoogleBtn) authGoogleBtn.addEventListener('click', handleGoogleSignIn);
+  if (authForm) authForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    handleEmailPasswordAuth();
+  });
+
+  if (authToggleBtn) {
+    authToggleBtn.addEventListener('click', () => {
+      openAuthModal(authModalMode === 'login' ? 'signup' : 'login');
+    });
+  }
 
   // Cards view triggers
   const cardsHeaderBtn = $('chat-cards-btn');
@@ -1605,7 +1877,9 @@ function init() {
   bindNews();
   resetChatUI();
 
-  loadSessions();
+  // Initialize Firebase client SDK & update UI
+  initFirebaseClient();
+  updateUserDisplay();
 
   const m = localStorage.getItem('preferred_model');
   if (m) $('model-selector').value = m;

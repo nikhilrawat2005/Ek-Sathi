@@ -28,53 +28,64 @@ async function requireAuth(req, res, next) {
   let userEmail = null;
   let userId = null;
 
-  // 1. Check explicit client email headers
+  // 1. Check if client explicitly flags anonymous / guest session
+  const isGuestHeader = req.headers['x-is-guest'] === 'true' || req.headers['x-guest-session'] === 'true';
+
+  // 2. Check explicit client email headers
   const headerEmail = req.headers['x-user-email'] || req.headers['x-student-email'];
-  if (headerEmail && typeof headerEmail === 'string' && headerEmail.includes('@')) {
+  if (headerEmail && typeof headerEmail === 'string' && headerEmail.includes('@') && !isGuestHeader) {
     userEmail = headerEmail.toLowerCase().trim();
   }
 
-  // 2. Check Authorization header
+  let isVerifiedFirebase = false;
+
+  // 3. Check Authorization header
   const authHeader = req.headers.authorization || '';
-  if (authHeader.startsWith('Bearer ')) {
+  if (authHeader.startsWith('Bearer ') && !isGuestHeader) {
     const token = authHeader.slice(7).trim();
 
-    // Check if token itself is an email
-    if (token.includes('@')) {
-      userEmail = userEmail || token.toLowerCase().trim();
-    } else if (token.startsWith('email:')) {
-      userEmail = userEmail || token.slice(6).toLowerCase().trim();
-    } else if (firebaseAdmin && typeof firebaseAdmin.auth === 'function' && token.length > 50) {
+    if (firebaseAdmin && typeof firebaseAdmin.auth === 'function' && token.length > 50 && !token.startsWith('email:')) {
       // Live Firebase Auth token verification
       try {
         const decoded = await firebaseAdmin.auth().verifyIdToken(token);
         if (decoded) {
           userEmail = decoded.email || userEmail;
           userId = decoded.uid;
+          isVerifiedFirebase = true;
         }
       } catch (_) {
         // Token was not a Firebase JWT, continue with fallback
       }
     }
+
+    if (!userEmail) {
+      if (token.includes('@')) {
+        userEmail = token.toLowerCase().trim();
+      } else if (token.startsWith('email:')) {
+        userEmail = token.slice(6).toLowerCase().trim();
+      }
+    }
   }
 
-  // 3. Fallback to query param or default
-  if (!userEmail && req.query && req.query.email && String(req.query.email).includes('@')) {
+  // 4. Fallback to query param
+  if (!userEmail && req.query && req.query.email && String(req.query.email).includes('@') && !isGuestHeader) {
     userEmail = String(req.query.email).toLowerCase().trim();
   }
 
-  // Fallback to configured default if completely unauthenticated
-  if (!userEmail) {
-    userEmail = process.env.DEFAULT_USER_EMAIL || 'student@eksathi.ai';
-  }
+  const isGuest = isGuestHeader || !userEmail;
 
-  if (!userId) {
+  if (isGuest) {
+    userEmail = 'guest@eksathi.local';
+    userId = 'guest_ephemeral';
+  } else if (!userId) {
     userId = sanitizeEmailToUserId(userEmail);
   }
 
   req.userId = userId;
   req.userEmail = userEmail;
-  req.user = { uid: userId, email: userEmail };
+  req.isGuest = isGuest;
+  req.isVerifiedFirebase = isVerifiedFirebase;
+  req.user = { uid: userId, email: userEmail, isGuest };
 
   next();
 }

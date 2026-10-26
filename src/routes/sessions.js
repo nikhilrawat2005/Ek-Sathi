@@ -6,6 +6,9 @@ const memory = require('../services/memoryService');
 // GET /api/sessions
 router.get('/', requireAuth, async (req, res) => {
   try {
+    if (req.isGuest) {
+      return res.json({ sessions: [] });
+    }
     const sessions = await memory.listSessions(req.userId);
     res.json({ sessions });
   } catch (err) {
@@ -16,6 +19,17 @@ router.get('/', requireAuth, async (req, res) => {
 // POST /api/sessions  { title? }
 router.post('/', requireAuth, async (req, res) => {
   try {
+    if (req.isGuest) {
+      // In guest mode, sessions are ephemeral in-memory only
+      return res.json({
+        session: {
+          id: 'ephemeral',
+          title: 'Guest Session',
+          createdAt: Date.now(),
+          isEphemeral: true,
+        }
+      });
+    }
     let title = req.body.title;
     if (title && (typeof title !== 'string' || title.length > 100)) {
       return res.status(400).json({ error: 'title must be a string under 100 characters' });
@@ -30,6 +44,9 @@ router.post('/', requireAuth, async (req, res) => {
 // GET /api/sessions/:id/messages
 router.get('/:id/messages', requireAuth, async (req, res) => {
   try {
+    if (req.isGuest || req.params.id === 'ephemeral') {
+      return res.json({ messages: [] });
+    }
     const messages = await memory.getRecentMessages(req.userId, req.params.id, 100);
     res.json({ messages });
   } catch (err) {

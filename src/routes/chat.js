@@ -386,9 +386,10 @@ router.get('/proactive-greeting', requireAuth, async (req, res) => {
   }
 });
 
-// POST /api/chat  { sessionId, message, model?, imageUrls?, documents? }
+// POST /api/chat  { sessionId, message, model?, imageUrls?, documents?, isEphemeral?, chatHistory? }
 router.post('/', requireAuth, async (req, res) => {
-  const { sessionId, message, model, imageUrls, documents } = req.body;
+  const { sessionId, message, model, imageUrls, documents, isEphemeral, chatHistory } = req.body;
+  const isGuestSession = req.isGuest || isEphemeral === true || sessionId === 'ephemeral';
   if (!sessionId || !message) {
     return res.status(400).json({ error: 'sessionId and message are required' });
   }
@@ -505,18 +506,23 @@ router.post('/', requireAuth, async (req, res) => {
 
   try {
     // 1. Behavior Profiler + Intent Router + Media Detection run in parallel
-    //    (they are independent, so we don't serialise their latency)
-    behaviorEngine.updateBehaviorProfile(req.userId, promptMessage).catch(err => console.error(err));
+    // (Only persist behavior profile for authenticated persistent users)
+    if (!isGuestSession) {
+      behaviorEngine.updateBehaviorProfile(req.userId, promptMessage).catch(err => console.error(err));
+    }
 
     // Fetch session title for page-linked memory
-    const sessionSnap = await require('../config/firebase').db.collection('users').doc(req.userId).collection('sessions').doc(sessionId).get().catch(() => null);
-    const sessionTitle = (sessionSnap && sessionSnap.exists && sessionSnap.data()?.title) || 'Main Chat';
+    let sessionTitle = 'Main Chat';
+    if (!isGuestSession) {
+      const sessionSnap = await require('../config/firebase').db.collection('users').doc(req.userId).collection('sessions').doc(sessionId).get().catch(() => null);
+      sessionTitle = (sessionSnap && sessionSnap.exists && sessionSnap.data()?.title) || 'Main Chat';
+    }
 
     // Comprehensive Memory Command & Intent Check:
     // Matches: "yaad rakh", "yaad rakhna", "remember this", "save in memory", "memory me update/store/rakh",
     // "store akrdo memory me" (typos), "store/save ... memory me", "memory me ... store/save", "track rakho", etc.
     const isExplicitMemoryCommand = /(?:yaad\s*(?:rakh|rakhna|kar\s*lo|karo)|remember\s*(?:this|that|to)?|note\s*(?:this|down)?|save\s*in\s*memory|memory\s*me\s*(?:update|add|save|rakh|daal|store|kr|kar)|(?:store|save|rakh|daal)\s*\w*\s*memory\s*me|memory\s*me\s*\w*\s*(?:store|save|rakh|daal|kr|kar)|track\s*(?:rakh|rakho|karo|karte\s*chalo)|(?:store|save)\s*(?:kar\s*(?:do|lo|dena)|[a-z]*do|[a-z]*lo)\s*memory|memory\s*(?:update|mein|me))/i.test(promptMessage);
-    if (isExplicitMemoryCommand) {
+    if (isExplicitMemoryCommand && !isGuestSession) {
       let cleanFact = promptMessage
         .replace(/^(?:bob|bhai|hey|please|bro|sun|suno)?[\s,:!-]*/i, '')
         .replace(/(?:ye|yeh|isko|isse|apni|meri)?\s*memory\s*me\s*(?:update\s*karte\s*chalo|update\s*karo|save\s*kar\s*lo|add\s*karo|store\s*karo|rakho)\s*(?:ki|that|:|,)?\s*/i, '')
@@ -554,14 +560,30 @@ router.post('/', requireAuth, async (req, res) => {
       console.log(`[Chat] Media detected: ${mediaEnrichment.detectedTypes.join(', ')} — ${allImageUrls.length} image(s) for vision`);
     }
 
-    // 2. Pull recent history & Dynamic Scoped Memory (Habits + Current Chat Session Only)
-    const [recent, scopedMem] = await Promise.all([
-      memory.getRecentMessages(req.userId, sessionId, 20),
-      memory.getDynamicScopedMemory(req.userId, { sessionId, sessionTitle }),
-    ]);
+    // 2. Pull history & Memory
+    let recent = [];
+    let scopedMem = { habits: [], rollingSummary: null, scoped: [] };
 
-    // 3. Save user's message
-    await memory.addMessage(req.userId, sessionId, 'user', promptMessage);
+    if (isGuestSession) {
+      // In guest mode, memory is purely in-memory ephemeral context
+      if (Array.isArray(chatHistory)) {
+        recent = chatHistory
+          .filter((m) => m && m.role && m.content)
+          .slice(-12)
+          .map((m) => ({ role: m.role, content: String(m.content).slice(0, 4000) }));
+      }
+    } else {
+      // Authenticated user: read from Firestore / DB
+      const [fetchedRecent, fetchedScoped] = await Promise.all([
+        memory.getRecentMessages(req.userId, sessionId, 20),
+        memory.getDynamicScopedMemory(req.userId, { sessionId, sessionTitle }),
+      ]);
+      recent = fetchedRecent || [];
+      scopedMem = fetchedScoped || scopedMem;
+
+      // 3. Save user's message
+      await memory.addMessage(req.userId, sessionId, 'user', promptMessage);
+    }
 
     let contextBlocks = [];
     if (liveBlock) {
@@ -750,46 +772,51 @@ Auto-extracted media data is provided in context below. Read full transcript/cap
     }
 
     // 6. Parse and extract any ```memory blocks from Bob's reply, then save them to memory database
+    // (Only save for authenticated users; guest users stay 100% ephemeral)
     const memoryBlockRegex = /```memory\s*\n([\s\S]*?)```/g;
     let memMatch;
     while ((memMatch = memoryBlockRegex.exec(text)) !== null) {
-      try {
-        const memData = JSON.parse(memMatch[1].trim());
-        const factText = memData.fact || memData.text;
-        const factCat = memData.category || null;
-        if (factText && factText.trim().length > 2) {
-          await memory.addFactUnique(req.userId, factText.trim(), factCat, {
-            sourceTitle: sessionTitle,
-            sourceType: 'chat',
-            sessionId,
-          });
-          console.log(`[Chat] Auto-saved memory fact from Bob: "${factText.trim()}"`);
+      if (!isGuestSession) {
+        try {
+          const memData = JSON.parse(memMatch[1].trim());
+          const factText = memData.fact || memData.text;
+          const factCat = memData.category || null;
+          if (factText && factText.trim().length > 2) {
+            await memory.addFactUnique(req.userId, factText.trim(), factCat, {
+              sourceTitle: sessionTitle,
+              sourceType: 'chat',
+              sessionId,
+            });
+            console.log(`[Chat] Auto-saved memory fact from Bob: "${factText.trim()}"`);
+          }
+        } catch (memErr) {
+          console.warn('[Chat] Failed to parse memory block:', memErr.message);
         }
-      } catch (memErr) {
-        console.warn('[Chat] Failed to parse memory block:', memErr.message);
       }
     }
 
     // Strip ```memory blocks from assistant text so Master gets clean readable response
     text = text.replace(/```memory\s*\n[\s\S]*?```\n?/g, '').trim();
 
-    // Save assistant's reply
-    await memory.addMessage(req.userId, sessionId, 'assistant', text);
-
-
+    // Save assistant's reply (persistent users only)
+    if (!isGuestSession) {
+      await memory.addMessage(req.userId, sessionId, 'assistant', text);
+    }
 
     // 7. Parse any schedule blocks from Bob's reply and auto-create tasks
     const scheduleRegex = /```schedule\s*\n([\s\S]*?)```/g;
     let schedMatch;
     const createdTasks = [];
     while ((schedMatch = scheduleRegex.exec(text)) !== null) {
-      try {
-        const taskData = JSON.parse(schedMatch[1].trim());
-        const task = await scheduler.createTask(req.userId, taskData);
-        createdTasks.push(task);
-        console.log(`[Chat] Auto-created scheduled task: "${task.title}" at ${new Date(task.scheduledAt).toISOString()}`);
-      } catch (parseErr) {
-        console.error('[Chat] Failed to parse schedule block:', parseErr.message);
+      if (!isGuestSession) {
+        try {
+          const taskData = JSON.parse(schedMatch[1].trim());
+          const task = await scheduler.createTask(req.userId, taskData);
+          createdTasks.push(task);
+          console.log(`[Chat] Auto-created scheduled task: "${task.title}" at ${new Date(task.scheduledAt).toISOString()}`);
+        } catch (parseErr) {
+          console.error('[Chat] Failed to parse schedule block:', parseErr.message);
+        }
       }
     }
 
@@ -833,7 +860,7 @@ Auto-extracted media data is provided in context below. Read full transcript/cap
         }
       }
 
-      if (updatedTitle) {
+      if (updatedTitle && !isGuestSession) {
         await memory.updateSessionTitle(req.userId, sessionId, updatedTitle);
         await memory.syncSessionFactTitles(req.userId, sessionId, updatedTitle);
       }
@@ -841,8 +868,8 @@ Auto-extracted media data is provided in context below. Read full transcript/cap
 
     // 9. Background Memory Summarizer:
     // Periodically and automatically rolls up long conversations into compact weekly summaries
-    // Runs in the background (non-blocking) so user response is never delayed.
-    if (recent && recent.length >= 8) {
+    // Runs in the background (non-blocking) for persistent accounts only.
+    if (!isGuestSession && recent && recent.length >= 8) {
       memoryManager.runWeeklyRollingSummarizer(req.userId).catch((sumErr) => {
         console.warn('[Memory] Background rolling summarizer notice:', sumErr.message);
       });

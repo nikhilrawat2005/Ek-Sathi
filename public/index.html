@@ -32,6 +32,9 @@
     <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M3.8 12h16.4M12 3.8c2.1 2 3.2 4.9 3.2 8.2S14.1 18.2 12 20.2c-2.1-2-3.2-4.9-3.2-8.2S9.9 5.8 12 3.8Z" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
     <symbol id="i-box" viewBox="0 0 24 24"><path d="M4 7.6 12 3l8 4.6v8.8L12 21l-8-4.6V7.6Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M4 7.6l8 4.6m0 0 8-4.6M12 12.2v8.8" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
     <symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3.5 13.8 9 19 11l-5.2 2-1.8 5.5L10.2 13 5 11l5.2-2L12 3.5Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M7.5 11V7.5a4.5 4.5 0 0 1 9 0V11" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="12" cy="16" r="1.3" fill="currentColor"/></symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   </svg>
 
   <div class="app-layout">
@@ -50,21 +53,28 @@
       <button class="btn-new-chat" id="new-chat-btn"><svg class="ic"><use href="#i-spark" /></svg>New Chat</button>
       <nav class="sidebar-nav">
         <button class="nav-btn active" data-view="chat"><svg class="ic"><use href="#i-chat" /></svg><span>Chat</span></button>
-        <button class="nav-btn" data-view="cards"><svg class="ic"><use href="#i-box" /></svg><span>Cards</span></button>
+        <button class="nav-btn" data-view="cards" id="nav-cards-btn">
+          <svg class="ic"><use href="#i-box" /></svg>
+          <span>Cards</span>
+          <span class="nav-lock-badge" id="nav-cards-lock-badge" title="Sign in required to access Feature Cards"><svg class="ic" style="width:12px;height:12px"><use href="#i-lock" /></svg></span>
+        </button>
       </nav>
-      <div class="sidebar-chats-section">
-        <div class="sidebar-section-label flex-between"><span>Chats</span></div>
+      <div class="sidebar-chats-section" id="sidebar-chats-section">
+        <div class="sidebar-section-label flex-between">
+          <span>Chats</span>
+          <span class="chat-mode-tag" id="chat-mode-tag">Guest</span>
+        </div>
         <div class="sessions-list" id="sessions-list"></div>
       </div>
       <div class="sidebar-bottom">
-        <div class="user-row" id="user-profile-row" title="Click to switch student email account" style="cursor: pointer;">
-          <div class="user-avatar" id="user-avatar"><span id="user-avatar-char">S</span></div>
+        <div class="user-row" id="user-profile-row" title="Account status" style="cursor: pointer;">
+          <div class="user-avatar" id="user-avatar"><span id="user-avatar-char">G</span></div>
           <div class="user-info">
-            <div class="user-name" id="user-display-name">Student Account</div>
-            <div class="user-email" id="user-display-email">student@eksathi.ai</div>
+            <div class="user-name" id="user-display-name">Guest Student</div>
+            <div class="user-email" id="user-display-email">Temporary session</div>
           </div>
-          <button class="btn-icon" id="switch-account-btn" title="Switch account" aria-label="Switch account">
-            <svg class="ic"><use href="#i-user" /></svg>
+          <button class="btn-icon" id="auth-action-btn" title="Sign In" aria-label="Sign In">
+            <svg class="ic" id="auth-action-icon"><use href="#i-user" /></svg>
           </button>
         </div>
       </div>
@@ -83,6 +93,11 @@
             <button class="btn-outline" id="chat-cards-btn" title="Feature Cards" style="padding: 6px 12px; font-size: var(--fs-xs); gap: 5px;">
               <svg class="ic" style="width: 14px; height: 14px;"><use href="#i-box" /></svg>
               <span>Feature Cards</span>
+              <span class="btn-lock-mini" id="chat-cards-lock-badge" title="Sign in required"><svg class="ic" style="width:11px;height:11px"><use href="#i-lock" /></svg></span>
+            </button>
+            <button class="btn-primary" id="header-signin-btn" style="padding: 6px 14px; font-size: var(--fs-xs); gap: 6px; display: none;">
+              <svg class="ic" style="width: 14px; height: 14px;"><use href="#i-user" /></svg>
+              <span>Sign In</span>
             </button>
             <select class="model-select" id="model-selector" title="Preferred model">
               <option value="">Auto (Smart)</option>
@@ -125,7 +140,28 @@
           </div>
         </div>
         <div class="cards-view-container">
-          <div class="cards-hub-grid">
+          <div class="cards-auth-gate" id="cards-auth-gate" style="display: none;">
+            <div class="gate-card">
+              <div class="gate-icon">
+                <svg class="ic"><use href="#i-lock" /></svg>
+              </div>
+              <h2 class="gate-title">Sign In to Access Feature Cards</h2>
+              <p class="gate-desc">
+                Hackathon Lab, Resume ATS Audit, Study Workspace, Job Finder, Tech News and Student Memory Vaults are unlocked when you sign in with Firebase.
+              </p>
+              <div class="gate-actions">
+                <button class="btn-primary" id="gate-signin-btn">
+                  <svg class="ic" style="width:16px;height:16px"><use href="#i-user" /></svg>
+                  <span>Sign In / Create Account</span>
+                </button>
+                <button class="btn-outline" id="gate-back-chat-btn">
+                  <span>Continue with Free Chat</span>
+                </button>
+              </div>
+              <p class="gate-hint">Guest chats stay purely in tab memory and disappear upon closing the tab.</p>
+            </div>
+          </div>
+          <div class="cards-hub-grid" id="cards-hub-grid">
             <div class="cards-hub-card" data-view-target="chat">
               <div class="cards-hub-icon-wrap" style="--hub-accent:#2563eb;--hub-bg:rgba(37,99,235,0.08)">
                 <svg class="ic"><use href="#i-chat" /></svg>
@@ -470,10 +506,52 @@
     </main>
   </div>
 
+  <!-- ═══ FIREBASE AUTH MODAL ═══ -->
+  <div class="auth-modal-overlay" id="auth-modal-overlay" style="display:none">
+    <div class="auth-modal-box">
+      <button class="auth-modal-close" id="auth-modal-close" aria-label="Close modal">✕</button>
+      <div class="auth-modal-header">
+        <div class="logo-orb" style="width:40px;height:40px;margin:0 auto 12px"></div>
+        <h2 class="auth-modal-title" id="auth-modal-title">Student Sign In</h2>
+        <p class="auth-modal-sub" id="auth-modal-sub">Sign in to save your chats in Firebase, build permanent student memory &amp; unlock all feature cards.</p>
+      </div>
+
+      <!-- Provider buttons -->
+      <button class="auth-google-btn" id="auth-google-btn">
+        <svg style="width:18px;height:18px" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
+        <span>Continue with Google</span>
+      </button>
+
+      <div class="auth-divider"><span>or with student email</span></div>
+
+      <form id="auth-form" class="auth-form" onsubmit="return false;">
+        <div class="auth-field">
+          <label for="auth-email">Student Email</label>
+          <input type="email" id="auth-email" placeholder="student@college.edu or name@gmail.com" required autocomplete="email" />
+        </div>
+        <div class="auth-field">
+          <label for="auth-password">Password</label>
+          <input type="password" id="auth-password" placeholder="At least 6 characters" required autocomplete="current-password" />
+        </div>
+        <div class="auth-error-msg" id="auth-error-msg" style="display:none"></div>
+        <button type="submit" class="btn-primary auth-submit-btn" id="auth-submit-btn">
+          <span>Sign In</span>
+        </button>
+      </form>
+
+      <div class="auth-toggle-mode">
+        <span id="auth-toggle-text">Don't have an account yet?</span>
+        <button class="auth-toggle-btn" id="auth-toggle-btn">Create one</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-  <script src="/app.js?v=22"></script>
+  <script src="/app.js?v=23"></script>
 </body>
 </html>
