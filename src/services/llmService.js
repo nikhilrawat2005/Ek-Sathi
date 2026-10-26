@@ -1,12 +1,12 @@
 const fetch = require('node-fetch');
-const geminiPool = require('./geminiPoolService');
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
 // ---------------------------------------------------------------------------
-// Single-Queue Key Bag Architecture (no Builder persona)
-// Ek Sathi Key Bag (Queue A: Active ⇄ Queue B: Cooldown/Rest)
-// Block : Gemini Burst Bag (Managed via geminiPoolService)
+// Two-Bag Cascade Architecture (OpenRouter Only):
+// Primary Bag (Bag 1): Active keys in rotation
+// Fallback Bag (Bag 2): Stores keys that hit 429/rate-limit from Bag 1
+// When Bag 1 is exhausted, Bag 2 takes over and recovered keys refill Bag 1
 // ---------------------------------------------------------------------------
 
 const _rawKeys = [];
@@ -116,6 +116,7 @@ class DualQueueKeyBag {
     this.keys = rawKeyList.map((key, idx) => ({
       key,
       keyId: _keyIdOf(key) || `${name}_${idx + 1}`,
+      label: _keyEnvName.get(key) || `OpenRouter Key ${idx + 1}`,
       last4: key.slice(-4),
       role: name,
       status: 'active', // 'active' | 'cooldown'
@@ -127,8 +128,8 @@ class DualQueueKeyBag {
       lastError: null,
     }));
 
-    this.queueA = [...this.keys]; // Active Working Queue
-    this.queueB = [];             // Cooldown / Next-Day Rest Queue
+    this.queueA = [...this.keys]; // Active Working Queue (Bag 1: Active Rotation)
+    this.queueB = [];             // Fallback Queue (Bag 2: Fallback Storage)
     this.cursor = 0;
     this.lastResetDay = new Date().getUTCDate();
   }
@@ -157,24 +158,41 @@ class DualQueueKeyBag {
     this.checkDailyReset();
     const now = Date.now();
 
-    // 1. Check if any keys in Queue B (cooldown) have recovered
+    // 1. Refill Active Bag 1: Move any recovered keys from Fallback Bag 2 back to Bag 1
     for (let i = this.queueB.length - 1; i >= 0; i--) {
       const k = this.queueB[i];
-      if (k.status === 'cooldown' && now > k.cooldownUntil) {
+      if (now > k.cooldownUntil) {
         k.status = 'active';
         this.queueB.splice(i, 1);
         if (!this.queueA.some(x => x.key === k.key)) {
           this.queueA.push(k);
+          console.log(`[llmService] Key ...${k.last4} (${k.keyId}) recovered from Fallback Bag and returned to Active Bag 1.`);
         }
       }
     }
 
-    // 2. If Queue A is empty, try to recover any ready keys from Queue B
+    // 2. Cascade Switch: If Active Bag 1 is completely empty/exhausted,
+    // take over with the readiest keys from Fallback Bag 2 and refill Bag 1
     if (this.queueA.length === 0 && this.queueB.length > 0) {
+      console.warn(`[llmService] Active Bag 1 is completely exhausted! Activating Fallback Bag 2 keys.`);
+      // Find readiest keys or those whose cooldown is nearest/past
       const ready = this.queueB.filter(k => now > k.cooldownUntil);
       if (ready.length > 0) {
-        this.queueA = ready;
-        this.queueB = this.queueB.filter(k => now <= k.cooldownUntil);
+        for (const k of ready) {
+          k.status = 'active';
+          const idx = this.queueB.indexOf(k);
+          if (idx !== -1) this.queueB.splice(idx, 1);
+          this.queueA.push(k);
+        }
+      } else {
+        // If all keys are strictly in cooldown time, pick the one with earliest cooldown expiration
+        this.queueB.sort((a, b) => (a.cooldownUntil || 0) - (b.cooldownUntil || 0));
+        const earliest = this.queueB.shift();
+        if (earliest) {
+          earliest.status = 'active';
+          this.queueA.push(earliest);
+          console.warn(`[llmService] Resumed key ...${earliest.last4} (${earliest.keyId}) from Fallback Bag 2 to prevent outage.`);
+        }
       }
     }
 
@@ -193,7 +211,7 @@ class DualQueueKeyBag {
     target.cooldownUntil = Date.now() + durationMs;
     target.lastError = reason;
 
-    // Move to Queue B if in Queue A
+    // Remove from Active Bag 1 and place into Fallback Bag 2
     const aIdx = this.queueA.findIndex(k => k.key === keyStr);
     if (aIdx !== -1) {
       this.queueA.splice(aIdx, 1);
@@ -201,7 +219,7 @@ class DualQueueKeyBag {
     if (!this.queueB.some(k => k.key === keyStr)) {
       this.queueB.push(target);
     }
-    console.warn(`[llmService] ${this.name} Key ...${target.last4} moved to Queue B (cooldown ${durationMs/1000}s): ${reason}`);
+    console.warn(`[llmService] Key ...${target.last4} hit rate-limit/fallback → Stored in Fallback Bag 2 (cooldown ${durationMs/1000}s): ${reason}`);
   }
 
   recordUsage(keyStr, tokens) {
@@ -209,9 +227,6 @@ class DualQueueKeyBag {
     if (!target || !tokens) return;
     target.tokens += tokens;
     target.lastUsed = Date.now();
-    // NOTE: Token count is tracked for display ONLY.
-    // Keys NEVER move to Queue B based on token count.
-    // Only a live 429 / rate-limit response triggers markCooldown().
     _persistKey(target.keyId, {
       last4: target.last4,
       tokens: target.tokens,
@@ -222,26 +237,49 @@ class DualQueueKeyBag {
   }
 
   getSnapshot() {
+    const now = Date.now();
     return {
       name: this.name,
       totalKeys: this.keys.length,
       activeCount: this.queueA.length,
       queueACount: this.queueA.length,
       queueBCount: this.queueB.length,
-      queueA: this.queueA.map(k => ({ keyId: k.keyId, last4: k.last4, status: k.status, tokensUsed: k.tokens, lastBalance: k.lastBalance })),
-      queueB: this.queueB.map(k => ({ keyId: k.keyId, last4: k.last4, status: k.status, cooldownUntil: k.cooldownUntil, tokensUsed: k.tokens })),
-      keys: this.keys.map(k => ({
+      queueA: this.queueA.map(k => ({
         keyId: k.keyId,
-        role: this.name,
-        pool: this.queueA.some(q => q.key === k.key) ? 'ACTIVE' : (this.queueB.some(q => q.key === k.key) ? 'EXHAUSTED' : 'NEW'),
+        label: k.label || k.keyId,
         last4: k.last4,
+        status: k.status,
         tokensUsed: k.tokens,
-        status: k.status === 'active' ? 'healthy' : 'cooldown',
-        balance: k.lastBalance,
-        used: k.lastUsed,
-        cooldownUntil: k.cooldownUntil,
-        lastError: k.lastError,
+        lastBalance: k.lastBalance
       })),
+      queueB: this.queueB.map(k => ({
+        keyId: k.keyId,
+        label: k.label || k.keyId,
+        last4: k.last4,
+        status: k.status,
+        cooldownUntil: k.cooldownUntil,
+        cooldownRemainingSec: Math.max(0, Math.round(((k.cooldownUntil || 0) - now) / 1000)),
+        tokensUsed: k.tokens,
+        lastError: k.lastError
+      })),
+      keys: this.keys.map(k => {
+        const inA = this.queueA.some(q => q.key === k.key);
+        const inB = this.queueB.some(q => q.key === k.key);
+        return {
+          keyId: k.keyId,
+          label: k.label || k.keyId,
+          role: this.name,
+          pool: inA ? 'ACTIVE' : (inB ? 'FALLBACK' : 'NEW'),
+          last4: k.last4,
+          tokensUsed: k.tokens,
+          status: inA ? 'healthy' : 'cooldown',
+          cooldownRemainingSec: inB ? Math.max(0, Math.round(((k.cooldownUntil || 0) - now) / 1000)) : 0,
+          balance: k.lastBalance,
+          used: k.lastUsed,
+          cooldownUntil: k.cooldownUntil,
+          lastError: k.lastError,
+        };
+      }),
     };
   }
 }
@@ -635,22 +673,7 @@ async function callOpenRouterDirect({
 }
 
 async function callLLM(opts = {}) {
-  const {
-    role = 'chat',
-    imageUrls = [],
-    useGeminiPool,
-    preferOpenRouter,
-  } = opts;
-
-  const hasImages = Array.isArray(imageUrls) && imageUrls.length > 0;
-  const isNonContinuous = NON_CONTINUOUS_ROLES.has(role) || useGeminiPool === true;
-
-  // Non-continuous burst tasks -> Route to Gemini Burst Bag with OpenRouter Fallback
-  if (isNonContinuous && !hasImages && !preferOpenRouter) {
-    return geminiPool.callGeminiWithFallback(opts, () => callOpenRouterDirect(opts));
-  }
-
-  // Interactive loops -> Route to OpenRouter Ek Sathi Bag
+  // 100% unified routing through OpenRouter two-bag cascade architecture
   return callOpenRouterDirect(opts);
 }
 
@@ -658,24 +681,12 @@ async function callLLMWithVision(opts) {
   return callLLM({ role: 'vision', ...opts });
 }
 
-// Parallel LLM dispatch: fans out `tasks` across the Gemini burst bag
-// (multiple keys — load is spread so no single key carries the batch, and a
-// rate-limited key fails over automatically) with an OpenRouter fallback.
-// Each task: { messages, model?, temperature?, max_tokens? }.
-// Returns an array of results aligned with the input tasks order.
-async function callLLMParallel(tasks = [], { role = 'seo', persona, concurrencyPerKey = 2, model } = {}) {
+// Parallel LLM dispatch: fans out `tasks` across the OpenRouter key pool
+// with automatic per-key rate-limit failover and rotation.
+async function callLLMParallel(tasks = [], { role = 'seo', persona, model } = {}) {
   await _ensureInit();
   if (!Array.isArray(tasks) || tasks.length === 0) return [];
-  const isNonContinuous = NON_CONTINUOUS_ROLES.has(role);
-  if (isNonContinuous) {
-    return geminiPool.runParallelGemini(tasks, {
-      model,
-      concurrencyPerKey: Math.max(1, Number(concurrencyPerKey) || 2),
-      fallbackFn: (task) => callOpenRouterDirect({ role, persona, ...task }),
-    });
-  }
-  // Continuous / interactive routes still use the OpenRouter bags, in parallel.
-  return Promise.all(tasks.map((task) => callOpenRouterDirect({ role, persona, ...task })));
+  return Promise.all(tasks.map((task) => callOpenRouterDirect({ role, persona, model, ...task })));
 }
 
 module.exports = {
@@ -693,9 +704,7 @@ module.exports = {
   checkKeyHealth,
   keyHealthSnapshot,
   resetKeyHealth,
-  getGeminiPoolHealth: geminiPool.getGeminiPoolHealth,
   getBagsSnapshot: () => ({
     bobBag: _bobBag.getSnapshot(),
-    geminiBag: geminiPool.getGeminiPoolHealth(),
   }),
 };

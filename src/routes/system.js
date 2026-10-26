@@ -31,6 +31,9 @@ router.get('/status', requireAuth, async (req, res) => {
     // 3. LLM Key Bags Snapshot
     const bags = getBagsSnapshot();
     const health = keyHealthSnapshot();
+    const bob = bags.bobBag || {};
+    const queueAKeys = bob.queueA || [];
+    const queueBKeys = bob.queueB || [];
 
     res.json({
       status: 'ok',
@@ -65,33 +68,33 @@ router.get('/status', requireAuth, async (req, res) => {
         }
       ],
       keyBags: {
-        totalKeysConfigured: (bags.bobBag?.totalKeys || 0) + (bags.geminiBag?.totalKeys || 0),
-        activeKeys: (bags.bobBag?.activeCount || 0) + (bags.geminiBag?.activeCount || 0),
-        fallbackKeys: (bags.bobBag?.queueBCount || 0) + (bags.geminiBag?.queueBCount || 0),
+        totalKeysConfigured: bob.totalKeys || 0,
+        activeKeys: bob.activeCount || 0,
+        fallbackKeys: bob.queueBCount || 0,
         bags: [
           {
-            name: 'Primary OpenRouter Key Bag (Queue A / B)',
-            total: bags.bobBag?.totalKeys || 0,
-            active: bags.bobBag?.activeCount || 0,
-            inCooldownOrFallback: bags.bobBag?.queueBCount || 0,
-            keys: (bags.bobBag?.keys || []).map(k => ({
-              label: k.label,
-              status: k.status, // active | cooldown | dead
-              cooldownRemainingSec: k.cooldownRemainingSec || 0,
-              usedTokens: k.usedTokens || 0,
-              lastError: k.lastError || null
+            name: 'Primary Key Bag (Active Rotation)',
+            total: bob.totalKeys || 0,
+            active: bob.activeCount || 0,
+            inCooldownOrFallback: 0,
+            keys: queueAKeys.map(k => ({
+              label: k.label || k.keyId,
+              status: 'active',
+              cooldownRemainingSec: 0,
+              usedTokens: k.tokensUsed || 0,
+              lastError: null
             }))
           },
           {
-            name: 'Gemini Burst Pool Bag',
-            total: bags.geminiBag?.totalKeys || 0,
-            active: bags.geminiBag?.activeCount || 0,
-            inCooldownOrFallback: (bags.geminiBag?.rateLimitedCount || 0) + (bags.geminiBag?.exhaustedCount || 0),
-            keys: (bags.geminiBag?.keys || []).map(k => ({
-              label: k.label,
-              status: k.status,
+            name: 'Fallback Key Bag (Rate-Limit Staging)',
+            total: bob.queueBCount || 0,
+            active: 0,
+            inCooldownOrFallback: bob.queueBCount || 0,
+            keys: queueBKeys.map(k => ({
+              label: k.label || k.keyId,
+              status: 'fallback',
               cooldownRemainingSec: k.cooldownRemainingSec || 0,
-              usedTokens: k.requestsToday || 0,
+              usedTokens: k.tokensUsed || 0,
               lastError: k.lastError || null
             }))
           }
