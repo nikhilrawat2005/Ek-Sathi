@@ -513,9 +513,14 @@ router.post('/', requireAuth, async (req, res) => {
 
     // Fetch session title for page-linked memory
     let sessionTitle = 'Main Chat';
+    let isCustomUserTitle = false;
     if (!isGuestSession) {
       const sessionSnap = await require('../config/firebase').db.collection('users').doc(req.userId).collection('sessions').doc(sessionId).get().catch(() => null);
-      sessionTitle = (sessionSnap && sessionSnap.exists && sessionSnap.data()?.title) || 'Main Chat';
+      if (sessionSnap && sessionSnap.exists) {
+        const sdata = sessionSnap.data() || {};
+        sessionTitle = sdata.title || 'Main Chat';
+        isCustomUserTitle = sdata.customTitle === true;
+      }
     }
 
     // Comprehensive Memory Command & Intent Check:
@@ -820,10 +825,10 @@ Auto-extracted media data is provided in context below. Read full transcript/cap
       }
     }
 
-    // 8. Smart Chat Naming: If session title is default or new, generate a 3-5 word descriptive title
+    // 8. Smart Chat Naming: If session title is default or new (and not manually customized by the user), generate a 3-5 word descriptive title
     let updatedTitle = null;
     const isDefaultTitle = !sessionTitle || /^New Chat\b|^Main Chat$/i.test(sessionTitle.trim()) || sessionTitle.trim().length === 0;
-    if (isDefaultTitle || recent.length <= 2) {
+    if (!isCustomUserTitle && (isDefaultTitle || recent.length <= 2)) {
       try {
         const titleRes = await callLLM({
           role: 'chat',
@@ -861,7 +866,9 @@ Auto-extracted media data is provided in context below. Read full transcript/cap
       }
 
       if (updatedTitle && !isGuestSession) {
-        await memory.updateSessionTitle(req.userId, sessionId, updatedTitle);
+        // Auto-generated titles keep customTitle false
+        const sessionRef = require('../config/firebase').db.collection('users').doc(req.userId).collection('sessions').doc(sessionId);
+        await sessionRef.set({ title: updatedTitle, customTitle: false }, { merge: true });
         await memory.syncSessionFactTitles(req.userId, sessionId, updatedTitle);
       }
     }

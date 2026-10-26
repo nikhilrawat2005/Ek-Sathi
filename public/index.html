@@ -35,6 +35,7 @@
     <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M7.5 11V7.5a4.5 4.5 0 0 1 9 0V11" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="12" cy="16" r="1.3" fill="currentColor"/></symbol>
     <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   </svg>
 
   <div class="app-layout">
@@ -86,8 +87,11 @@
       <!-- ─── CHAT VIEW ─── -->
       <section class="view active" id="view-chat">
         <div class="view-header">
-          <div>
+          <div class="chat-header-title-wrap">
             <div class="view-title" id="chat-session-title">New Chat</div>
+            <button class="btn-icon btn-edit-header-title" id="chat-session-edit-btn" title="Rename this chat" style="display:none;width:24px;height:24px;padding:4px">
+              <svg class="ic" style="width:13px;height:13px"><use href="#i-edit" /></svg>
+            </button>
           </div>
           <div class="view-header-actions">
             <button class="btn-outline" id="chat-cards-btn" title="Feature Cards" style="padding: 6px 12px; font-size: var(--fs-xs); gap: 5px;">

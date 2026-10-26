@@ -18,7 +18,7 @@ async function createSession(userId, title = 'New chat', type = 'chat') {
 
 async function updateSessionTitle(userId, sessionId, title) {
   const sessionRef = db.collection('users').doc(userId).collection('sessions').doc(sessionId);
-  await sessionRef.set({ title }, { merge: true });
+  await sessionRef.set({ title, customTitle: true }, { merge: true });
 }
 
 async function listSessions(userId, type = null) {

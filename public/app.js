@@ -319,13 +319,24 @@ function renderSessions() {
   }
   list.innerHTML = sessions.map((s) => `
     <div class="session-item ${s.id === currentSessionId ? 'active' : ''}" data-id="${escHtml(s.id)}">
-      <div class="session-title">${escHtml(s.title || 'Untitled')}</div>
-      <button class="btn-delete-session" title="Delete chat" data-del="${escHtml(s.id)}"><svg class="ic" style="width:13px;height:13px"><use href="#i-trash" /></svg></button>
+      <div class="session-title" title="${escHtml(s.title || 'Untitled')}">${escHtml(s.title || 'Untitled')}</div>
+      <div class="session-item-actions">
+        <button class="btn-edit-session" title="Rename chat" data-edit="${escHtml(s.id)}" data-title="${escHtml(s.title || '')}"><svg class="ic" style="width:12px;height:12px"><use href="#i-edit" /></svg></button>
+        <button class="btn-delete-session" title="Delete chat" data-del="${escHtml(s.id)}"><svg class="ic" style="width:13px;height:13px"><use href="#i-trash" /></svg></button>
+      </div>
     </div>`).join('');
   list.querySelectorAll('.session-item').forEach((el) => {
     el.addEventListener('click', (e) => {
-      if (e.target.classList.contains('btn-delete-session')) return;
+      if (e.target.closest('.btn-delete-session') || e.target.closest('.btn-edit-session')) return;
       switchSession(el.dataset.id);
+    });
+  });
+  list.querySelectorAll('.btn-edit-session').forEach((btn) => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const id = btn.dataset.edit;
+      const currentTitle = btn.dataset.title || '';
+      await renameSessionPrompt(id, currentTitle);
     });
   });
   list.querySelectorAll('.btn-delete-session').forEach((btn) => {
@@ -342,6 +353,34 @@ function renderSessions() {
   });
 }
 
+async function renameSessionPrompt(id, currentTitle) {
+  if (!id || id === 'ephemeral') return;
+  const newTitle = prompt('Enter new chat title:', currentTitle || '');
+  if (newTitle === null) return; // user cancelled
+  const trimmed = newTitle.trim();
+  if (!trimmed) {
+    alert('Title cannot be empty');
+    return;
+  }
+  try {
+    const res = await apiFetch(`/api/sessions/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: trimmed }),
+    });
+    const s = sessions.find((x) => x.id === id);
+    if (s) {
+      s.title = res.title || trimmed;
+    }
+    if (currentSessionId === id) {
+      $('chat-session-title').textContent = res.title || trimmed;
+    }
+    renderSessions();
+  } catch (err) {
+    alert(err.message || 'Failed to rename chat');
+  }
+}
+
 async function createSession() {
   if (!isUserSignedIn()) {
     currentSessionId = 'ephemeral';
@@ -356,7 +395,13 @@ async function createSession() {
 async function switchSession(id) {
   currentSessionId = id;
   renderSessions();
-  $('chat-session-title').textContent = (sessions.find((s) => s.id === id) || {}).title || 'Chat';
+  const currentSess = sessions.find((s) => s.id === id);
+  const activeTitle = (currentSess && currentSess.title) || 'Chat';
+  $('chat-session-title').textContent = activeTitle;
+  const headerEditBtn = $('chat-session-edit-btn');
+  if (headerEditBtn) {
+    headerEditBtn.style.display = (isUserSignedIn() && id && id !== 'ephemeral') ? 'inline-flex' : 'none';
+  }
   const typing = document.querySelector('.typing-indicator');
   if (typing) typing.remove();
   try {
@@ -374,6 +419,8 @@ function resetChatUI() {
     guestChatMessages = [];
   }
   $('chat-session-title').textContent = 'New Chat';
+  const headerEditBtn = $('chat-session-edit-btn');
+  if (headerEditBtn) headerEditBtn.style.display = 'none';
   const welcome = `
     <div id="welcome-screen" class="welcome-screen">
       <div class="welcome-orb"><svg class="ic"><use href="#i-spark" /></svg></div>
@@ -575,6 +622,10 @@ async function sendMessage() {
       const s = sessions.find((x) => x.id === currentSessionId);
       if (s) s.title = data.updatedTitle;
       renderSessions();
+    }
+    const headerEditBtn = $('chat-session-edit-btn');
+    if (headerEditBtn && !isGuest && currentSessionId && currentSessionId !== 'ephemeral') {
+      headerEditBtn.style.display = 'inline-flex';
     }
     appendMessage('assistant', replyText);
   } catch (err) {
@@ -1853,6 +1904,17 @@ function init() {
   if (authToggleBtn) {
     authToggleBtn.addEventListener('click', () => {
       openAuthModal(authModalMode === 'login' ? 'signup' : 'login');
+    });
+  }
+
+  // Chat header title edit button
+  const headerEditBtn = $('chat-session-edit-btn');
+  if (headerEditBtn) {
+    headerEditBtn.addEventListener('click', async () => {
+      if (!currentSessionId || currentSessionId === 'ephemeral') return;
+      const s = sessions.find((x) => x.id === currentSessionId);
+      const curr = (s && s.title) || $('chat-session-title').textContent || '';
+      await renameSessionPrompt(currentSessionId, curr);
     });
   }
 
