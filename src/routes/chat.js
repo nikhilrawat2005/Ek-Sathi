@@ -828,16 +828,21 @@ Auto-extracted media data is provided in context below. Read full transcript/cap
     // 8. Smart Chat Naming: If session title is default or new (and not manually customized by the user), generate a 3-5 word descriptive title
     let updatedTitle = null;
     const isDefaultTitle = !sessionTitle || /^New Chat\b|^Main Chat$/i.test(sessionTitle.trim()) || sessionTitle.trim().length === 0;
-    if (!isCustomUserTitle && (isDefaultTitle || recent.length <= 2)) {
+    if (!isCustomUserTitle && (isDefaultTitle || recent.length <= 4)) {
       try {
+        // Collect past few messages to give rich conversational context for title generation
+        const contextSnippet = (recent && recent.length)
+          ? recent.slice(-3).map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${String(m.content || '').slice(0, 150)}`).join('\n') + `\nUser: ${promptMessage.slice(0, 250)}\nAssistant: ${text.slice(0, 200)}`
+          : `User: ${promptMessage.slice(0, 350)}\nAssistant: ${text.slice(0, 250)}`;
+
         const titleRes = await callLLM({
           role: 'chat',
           messages: [
-            { role: 'system', content: 'Generate a short, punchy 3 to 5 word title with 1 relevant leading emoji for this chat based on the user request. Output ONLY the title, no quotes, no extra words. Example: "🐍 Python Web Scraper" or "⚛️ React Auth Guide".' },
-            { role: 'user', content: `User: ${promptMessage.slice(0, 350)}\nAssistant: ${text.slice(0, 250)}` }
+            { role: 'system', content: 'Generate a short, punchy 3 to 5 word topic title with 1 relevant leading emoji for this chat conversation. Output ONLY the title text, no quotation marks, no markdown symbols. Example: "🐍 Python Web Scraper" or "⚛️ React Auth Guide" or "📊 Data Analysis".' },
+            { role: 'user', content: contextSnippet }
           ],
-          temperature: 0.4,
-          max_tokens: 60,
+          temperature: 0.3,
+          max_tokens: 50,
         });
         if (titleRes && titleRes.text) {
           const cleanText = titleRes.text.trim().replace(/^["']|["']$/g, '').replace(/^#+\s*/, '').trim();
