@@ -212,6 +212,7 @@ router.get('/', async (req, res) => {
 
       oppCache = { data: defaultOpportunities, expires: Date.now() + CACHE_TTL };
     }
+  }
 
     let results = oppCache.data || [];
     if (filterType === 'internship') {
