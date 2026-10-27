@@ -1,11 +1,61 @@
 const express = require('express');
 const router = express.Router();
 const fetch = require('node-fetch');
+const crypto = require('crypto');
+const { db } = require('../config/firebase');
 const discovery = require('../services/hackathonDiscoveryService');
 
 // In-memory cache for opportunities
 let oppCache = { data: null, expires: 0 };
 const CACHE_TTL = 30 * 60 * 1000; // 30 mins
+
+function makeDocId(link) {
+  return crypto.createHash('sha256').update(String(link).trim().toLowerCase()).digest('hex').slice(0, 32);
+}
+
+/**
+ * Sync opportunities to Firestore collection `global_opportunities`
+ */
+async function syncOpportunitiesToFirestore(opportunities) {
+  if (!db || !Array.isArray(opportunities) || opportunities.length === 0) return;
+  try {
+    const coll = db.collection('global_opportunities');
+    const batch = db.batch ? db.batch() : null;
+    const now = Date.now();
+
+    for (const item of opportunities) {
+      if (!item.link) continue;
+      const docId = makeDocId(item.link);
+      const docRef = coll.doc(docId);
+      const payload = {
+        id: docId,
+        title: item.title,
+        link: item.link,
+        company: item.company || '',
+        type: item.type || 'hackathon',
+        source: item.source || '',
+        description: item.description || '',
+        tags: item.tags || [],
+        stipend: item.stipend || '',
+        deadline: item.deadline || '',
+        updatedAt: now,
+        lastScrapedAt: now,
+      };
+
+      if (batch) {
+        batch.set(docRef, payload, { merge: true });
+      } else {
+        await docRef.set(payload, { merge: true });
+      }
+    }
+
+    if (batch) {
+      await batch.commit();
+    }
+  } catch (err) {
+    console.warn('[opportunities] syncOpportunitiesToFirestore error:', err.message);
+  }
+}
 
 // GET /api/opportunities?type=all|internship|hackathon
 router.get('/', async (req, res) => {
@@ -14,8 +64,28 @@ router.get('/', async (req, res) => {
 
     // Check cache
     if (!oppCache.data || Date.now() > oppCache.expires) {
-      // 1. Static high-value opportunities
-      const defaultOpportunities = [
+      // 1. Try reading recent opportunities from Firestore first
+      let fromDb = [];
+      try {
+        if (db) {
+          const snap = await db.collection('global_opportunities')
+            .orderBy('updatedAt', 'desc')
+            .limit(100)
+            .get();
+
+          if (!snap.empty) {
+            fromDb = snap.docs.map(d => d.data());
+          }
+        }
+      } catch (_) {}
+
+      // If Firestore has fresh data (< 30 min old), use it directly
+      const newest = fromDb[0]?.updatedAt || 0;
+      if (fromDb.length >= 10 && (Date.now() - newest < CACHE_TTL)) {
+        oppCache = { data: fromDb, expires: Date.now() + CACHE_TTL };
+      } else {
+        // 2. Static high-value opportunities
+        const defaultOpportunities = [
         {
           title: "Web Development Internships",
           company: "Internshala",
@@ -136,6 +206,9 @@ router.get('/', async (req, res) => {
       } catch (_) {
         // Fallback to defaults
       }
+
+      // Upsert opportunities to Firestore in background
+      syncOpportunitiesToFirestore(defaultOpportunities).catch(() => {});
 
       oppCache = { data: defaultOpportunities, expires: Date.now() + CACHE_TTL };
     }

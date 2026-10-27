@@ -69,6 +69,7 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 4646;
+const scheduler = require('./services/schedulerService');
 
 // Vercel imports this file as a serverless function (module.exports = app),
 // but app.listen also lets it run standalone locally with `npm run dev`.
@@ -76,6 +77,17 @@ if (require.main === module) {
   const server = app.listen(PORT, () => {
     console.log(`Ek Sathi running at http://localhost:${PORT}`);
     console.log(`Health check: http://localhost:${PORT}/api/health`);
+
+    // In local persistent server mode, run background scrape scheduler & task tick
+    // Initial quick tick after 5 seconds, then every 60 seconds
+    setTimeout(() => {
+      scheduler.tick().catch(() => {});
+      scheduler.runScheduledScrapers().catch(() => {});
+    }, 5000);
+
+    setInterval(() => {
+      scheduler.tick().catch(() => {});
+    }, 60 * 1000);
   });
 
   server.on('error', (error) => {

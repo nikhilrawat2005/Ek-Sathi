@@ -1,6 +1,49 @@
 const { db } = require('../config/firebase');
 const { callLLM } = require('./llmService');
 const memory = require('./memoryService');
+const newsService = require('./newsService');
+const hackDiscovery = require('./hackathonDiscoveryService');
+
+// ─────────────────────────────────────────────────────────
+// Scrape Schedule Sync & Background Worker
+// ─────────────────────────────────────────────────────────
+let lastNewsScrape = 0;
+let lastDiscoveryScrape = 0;
+const NEWS_SCRAPE_INTERVAL = 30 * 60 * 1000; // 30 minutes
+const DISCOVERY_SCRAPE_INTERVAL = 4 * 24 * 60 * 60 * 1000; // 4 days
+
+async function runScheduledScrapers(userId = 'nikhil_master_workspace') {
+  const now = Date.now();
+  const report = {};
+
+  // 1. Sync & edit news in Firestore every 30 minutes
+  if (now - lastNewsScrape >= NEWS_SCRAPE_INTERVAL) {
+    try {
+      console.log('[Scheduler] Running scheduled news scrape & Firestore update...');
+      const results = await newsService.syncAllNewsToFirestore();
+      lastNewsScrape = now;
+      report.news = { synced: true, results };
+    } catch (e) {
+      console.warn('[Scheduler] news sync error:', e.message);
+      report.news = { error: e.message };
+    }
+  }
+
+  // 2. Discover & edit hackathons/internships in Firestore every 4 days
+  if (now - lastDiscoveryScrape >= DISCOVERY_SCRAPE_INTERVAL) {
+    try {
+      console.log('[Scheduler] Running scheduled hackathon & internship discovery...');
+      const res = await hackDiscovery.runDiscovery(userId, false);
+      lastDiscoveryScrape = now;
+      report.discovery = res;
+    } catch (e) {
+      console.warn('[Scheduler] discovery scrape error:', e.message);
+      report.discovery = { error: e.message };
+    }
+  }
+
+  return report;
+}
 
 // ─────────────────────────────────────────────────────────
 // Firestore helpers for scheduledTasks collection
@@ -183,6 +226,9 @@ async function tick() {
       if (ok) fired++;
     }
 
+    // Also run periodic scrape check in background
+    runScheduledScrapers().catch(() => {});
+
     return { fired, total: tasks.length };
   } catch (err) {
     console.error('[Scheduler] tick error:', err.message);
@@ -200,4 +246,4 @@ function computeNextFire(lastScheduledAt, repeat) {
   return lastScheduledAt + ms;
 }
 
-module.exports = { createTask, listTasks, cancelTask, fireTask, tick, computeNextFire };
+module.exports = { createTask, listTasks, cancelTask, fireTask, tick, runScheduledScrapers, computeNextFire };

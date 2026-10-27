@@ -5,6 +5,16 @@
  * (no extra dependency) that handles RSS 2.0 <item> entries.
  */
 
+const crypto = require('crypto');
+const { db, FieldValue } = require('../config/firebase');
+
+/**
+ * Make a deterministic safe Firestore doc ID from link
+ */
+function makeDocId(link) {
+  return crypto.createHash('sha256').update(String(link).trim().toLowerCase()).digest('hex').slice(0, 32);
+}
+
 // ─────────────────────────────────────────────────────────
 // Category → feed URL(s). All are public, key-free RSS feeds.
 // ─────────────────────────────────────────────────────────
@@ -151,14 +161,79 @@ function parseRSS(xml) {
 }
 
 /**
+ * Save / Update scraped news items in Firestore (global_news)
+ * Automatically updates existing documents if link matches.
+ */
+async function syncNewsToFirestore(category, articles) {
+  if (!db || !Array.isArray(articles) || articles.length === 0) return;
+  try {
+    const coll = db.collection('global_news');
+    const batch = db.batch ? db.batch() : null;
+    const now = Date.now();
+
+    for (const item of articles) {
+      if (!item.link) continue;
+      const docId = makeDocId(item.link);
+      const docRef = coll.doc(docId);
+      const payload = {
+        id: docId,
+        title: item.title,
+        link: item.link,
+        description: item.description || '',
+        publishedAt: item.publishedAt || '',
+        category,
+        updatedAt: now,
+        lastScrapedAt: now,
+      };
+
+      if (batch) {
+        batch.set(docRef, payload, { merge: true });
+      } else {
+        await docRef.set(payload, { merge: true });
+      }
+    }
+
+    if (batch) {
+      await batch.commit();
+    }
+  } catch (err) {
+    console.warn(`[newsService] syncNewsToFirestore error (${category}):`, err.message);
+  }
+}
+
+/**
  * Fetch headlines for a category.
- * Returns [{ title, link }, ...] (max `limit`).
+ * Reads from Firestore or falls back / syncs with RSS.
+ * Returns [{ title, link, description, publishedAt }, ...] (max `limit`).
  */
 async function getNews(category = 'top', limit = 5) {
   const cat = (FEEDS[category] ? category : 'top');
   const urls = FEEDS[cat];
 
   const items = await cached(`news:${cat}`, async () => {
+    // 1. Try reading fresh records from Firestore first (within 30 mins)
+    try {
+      if (db) {
+        const snap = await db.collection('global_news')
+          .where('category', '==', cat)
+          .orderBy('updatedAt', 'desc')
+          .limit(limit * 2)
+          .get();
+
+        if (!snap.empty) {
+          const docs = snap.docs.map(d => d.data());
+          // If latest document is fresher than 30 mins, return cached Firestore items
+          const newest = docs[0]?.updatedAt || 0;
+          if (Date.now() - newest < CACHE_TTL && docs.length >= Math.min(limit, 5)) {
+            return docs;
+          }
+        }
+      }
+    } catch (e) {
+      // ignore & continue to live scrape
+    }
+
+    // 2. Perform live scrape
     const collected = [];
     const settled = await Promise.allSettled(urls.map(url => fetchText(url)));
     for (const r of settled) {
@@ -176,10 +251,32 @@ async function getNews(category = 'top', limit = 5) {
         unique.push(it);
       }
     }
+
+    // 3. Upsert / update items into Firestore in background
+    if (unique.length > 0) {
+      syncNewsToFirestore(cat, unique).catch(() => {});
+    }
+
     return unique;
   });
 
   return items.slice(0, limit);
+}
+
+/**
+ * Periodic full sync for all news categories to Firestore
+ */
+async function syncAllNewsToFirestore() {
+  const results = {};
+  for (const cat of Object.keys(FEEDS)) {
+    try {
+      const articles = await getNews(cat, 25);
+      results[cat] = articles.length;
+    } catch (err) {
+      results[cat] = 0;
+    }
+  }
+  return results;
 }
 
 /** Compact numbered list ready for the LLM context. */
@@ -190,4 +287,4 @@ function formatNews(headlines) {
     .join('\n');
 }
 
-module.exports = { getNews, formatNews, FEEDS, parseRSS };
+module.exports = { getNews, syncNewsToFirestore, syncAllNewsToFirestore, formatNews, FEEDS, parseRSS };

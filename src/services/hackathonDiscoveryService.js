@@ -21,9 +21,14 @@
 
 const fetch = require('node-fetch');
 const cheerio = require('cheerio');
+const crypto = require('crypto');
 const { db } = require('../config/firebase');
 const { callLLM } = require('./llmService');
 const hackathonService = require('./hackathonService');
+
+function makeLinkHash(link) {
+  return crypto.createHash('sha256').update(String(link).split('?')[0].toLowerCase().trim()).digest('hex').slice(0, 32);
+}
 
 // ── Constants ────────────────────────────────────────────
 const DISCOVERY_INTERVAL_MS = 4 * 24 * 60 * 60 * 1000; // 4 days
@@ -781,15 +786,21 @@ async function runDiscovery(userId, force = false) {
   // 6. Enrich items with concurrency limit of 5 for speed
   const enriched = await mapConcurrent(toAdd, 5, (item) => enrichItem(item));
 
-  // 7. Save to Firestore
+  // 7. Save / Update in Firestore
+  // Uses deterministic doc ID based on link so repeating scrape schedules automatically edit/update cards
   const coll = discoveryColl(userId);
-  const batch = db.batch();
+  const globalColl = db.collection('global_opportunities');
+  const batch = db.batch ? db.batch() : null;
   const newSeenLinks = [...seenLinks];
 
   for (const item of enriched) {
-    const ref = coll.doc();
-    batch.set(ref, {
-      id: ref.id,
+    const normalLink = item.link.split('?')[0].toLowerCase().trim();
+    const docId = makeLinkHash(normalLink);
+    const userDocRef = coll.doc(docId);
+    const globalDocRef = globalColl.doc(docId);
+
+    const payload = {
+      id: docId,
       type: item.type || 'hackathon',
       title: item.title,
       platform: item.platform,
@@ -813,16 +824,24 @@ async function runDiscovery(userId, force = false) {
       company: item.company || '',
       stipend: item.stipend || '',
       duration: item.duration || '',
-      scrapedAt: now,
-      discoveredAt: now,
+      lastScrapedAt: now,
+      updatedAt: now,
       status: 'new',
-      savedHackathonId: null,
-    });
-    const normalLink = item.link.split('?')[0].toLowerCase().trim();
+    };
+
+    if (batch) {
+      batch.set(userDocRef, { ...payload, discoveredAt: now }, { merge: true });
+      batch.set(globalDocRef, payload, { merge: true });
+    } else {
+      await userDocRef.set({ ...payload, discoveredAt: now }, { merge: true });
+      await globalDocRef.set(payload, { merge: true });
+    }
     newSeenLinks.push(normalLink);
   }
 
-  await batch.commit();
+  if (batch) {
+    await batch.commit();
+  }
 
   // 8. Update meta
   await setMeta(userId, {
