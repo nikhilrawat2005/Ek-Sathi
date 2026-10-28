@@ -771,13 +771,13 @@ function renderSavedGrid() {
         </div>
         ${(c.tags && c.tags.length) ? `<div class="d-card-meta">${c.tags.slice(0, 6).map((t) => `<span class="d-card-tag">${escHtml(t)}</span>`).join('')}</div>` : ''}
         <div class="d-card-foot">
-          ${c.link ? `<a class="d-link" href="${escHtml(c.link)}" target="_blank" rel="noopener">View details ↗</a>` : ''}
+          ${c.link ? `<a class="d-link" href="${escHtml(c.link)}" target="_blank" rel="noopener">Details ↗</a>` : '<span></span>'}
           <div class="d-card-actions">
-            <button class="btn-primary" style="padding:6px 12px;font-size:12px;border-radius:6px;gap:5px" data-open-chat="${escHtml(c.id)}" title="Open dedicated chat session with all features">
+            <button class="btn-primary" data-open-chat="${escHtml(c.id)}" title="Open full dedicated chat session">
               <svg class="ic" style="width:13px;height:13px"><use href="#i-chat" /></svg>
-              <span>Chat / Discuss</span>
+              <span>Discuss</span>
             </button>
-            <button class="btn-ghost" data-discuss="${escHtml(c.id)}" title="Quick preview overlay">Quick View</button>
+            <button class="btn-ghost" data-discuss="${escHtml(c.id)}" title="Quick preview overlay">Preview</button>
             <button class="btn-ghost-red" data-unsave="${escHtml(c.id)}" title="Remove from saved">Unsave</button>
           </div>
         </div>
