@@ -894,6 +894,7 @@ function renderDiscoverGrid() {
       isIntern && c.duration ? `, ${c.duration}` : '',
       !isIntern && c.seatsStatus ? `, ${c.seatsStatus}` : '',
     ].join(' | ').replace(/^\s*\|\s*/, '');
+    const dateLabel = cardDateLabel(c);
     return `
       <div class="d-card ${isIntern ? 'intern' : 'hack'}" data-id="${escHtml(c.id)}">
         <div class="d-card-head">
@@ -903,20 +904,20 @@ function renderDiscoverGrid() {
           </div>
         </div>
         <div class="d-card-body">
+          ${dateLabel ? `<div class="d-card-date-badge"><svg class="ic" style="width:13px;height:13px"><use href="#i-refresh" /></svg><span>${escHtml(dateLabel)}</span></div>` : ''}
           ${c.summary ? `<p>${escHtml(c.summary)}</p>` : ''}
           ${c.whatToBuild ? `<p><strong>What to build:</strong> ${escHtml(c.whatToBuild)}</p>` : ''}
           ${c.prize ? `<p><span class="d-prize">${escHtml(c.prize)}</span></p>` : ''}
           ${isIntern && c.company ? `<p>${escHtml(c.company)}</p>` : ''}
           ${metaBits ? `<p>${escHtml(metaBits)}</p>` : ''}
-          ${cardDateLabel(c) ? `<p>${escHtml(cardDateLabel(c))}</p>` : ''}
         </div>
         ${(c.tags && c.tags.length) ? `<div class="d-card-meta">${c.tags.slice(0, 6).map((t) => `<span class="d-card-tag">${escHtml(t)}</span>`).join('')}</div>` : ''}
         <div class="d-card-foot">
-          ${c.link ? `<a class="d-link" href="${escHtml(c.link)}" target="_blank" rel="noopener">View details ↗</a>` : ''}
+          ${c.link ? `<a class="d-link" href="${escHtml(c.link)}" target="_blank" rel="noopener">View details ↗</a>` : '<span></span>'}
           <div class="d-card-actions">
-            <button class="btn-ghost" data-discuss="${escHtml(c.id)}">Discuss</button>
-            <button class="btn-ghost" data-save="${escHtml(c.id)}">Save</button>
-            <button class="btn-ghost-red" data-dismiss="${escHtml(c.id)}">Dismiss</button>
+            <button class="btn-ghost" data-discuss="${escHtml(c.id)}" title="Discuss in quick overlay chat">Discuss</button>
+            <button class="btn-ghost" data-save="${escHtml(c.id)}" title="Save to Hackathon Lab">Save</button>
+            <button class="btn-ghost-red" data-dismiss="${escHtml(c.id)}" title="Dismiss opportunity">Dismiss</button>
           </div>
         </div>
       </div>`;
