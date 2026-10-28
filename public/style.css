@@ -690,6 +690,44 @@ input::placeholder, textarea::placeholder { color: var(--text3); }
 
 .d-card-body { font-size: var(--fs-sm); color: var(--text2); flex: 1; line-height: 1.6; }
 .d-card-body p + p { margin-top: 6px; }
+.d-card-date-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(var(--amber-rgb), 0.12);
+  color: var(--amber-dark);
+  border: 1px solid rgba(var(--amber-rgb), 0.28);
+  font-size: 11px;
+  font-weight: 650;
+  padding: 3px 9px;
+  border-radius: var(--r-full);
+  margin-bottom: 6px;
+}
+.sidebar-subgroup-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  padding: 6px var(--sp-3) 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.sidebar-subgroup-title .subgroup-count {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  padding: 0 6px;
+  border-radius: var(--r-full);
+  font-size: 9.5px;
+}
+.session-item.session-hackathon {
+  border-left: 2.5px solid #d97706;
+}
+.session-item.session-hackathon.active {
+  border-left-color: #d97706;
+  background: rgba(217, 119, 6, 0.08);
+}
 .d-prize { font-weight: 700; color: var(--accent); letter-spacing: -0.01em; }
 .d-card-meta { display: flex; flex-wrap: wrap; gap: 6px; }
 .d-card-tag {

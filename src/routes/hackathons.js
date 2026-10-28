@@ -73,6 +73,15 @@ router.post('/discover/:id/save', requireAuth, async (req, res) => {
   }
 });
 
+// POST /api/hackathons/discover/:id/unsave → remove from saved
+router.post('/discover/:id/unsave', requireAuth, async (req, res) => {
+  try {
+    res.json(await discovery.unsaveDiscovery(req.userId, req.params.id));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/hackathons/discover/:id/dismiss
 router.post('/discover/:id/dismiss', requireAuth, async (req, res) => {
   try {
@@ -120,6 +129,65 @@ router.post('/discover/:id/discussion', requireAuth, async (req, res) => {
       content: req.body && req.body.content,
     });
     res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/hackathons/discover/:id/session — ensure full chat session for a saved discovery item
+router.post('/discover/:id/session', requireAuth, async (req, res) => {
+  try {
+    const docRef = require('../config/firebase').db.collection('users').doc(req.userId).collection('hackathonDiscovery').doc(req.params.id);
+    const snap = await docRef.get();
+    if (!snap.exists) return res.status(404).json({ error: 'Discovery card not found' });
+    const item = snap.data();
+
+    // If already has a valid chatSessionId, check if it still exists
+    if (item.chatSessionId) {
+      const sessSnap = await require('../config/firebase').db.collection('users').doc(req.userId).collection('sessions').doc(item.chatSessionId).get();
+      if (sessSnap.exists) {
+        return res.json({ sessionId: item.chatSessionId });
+      }
+    }
+
+    // Link or create in hackathons collection if needed
+    let hack = null;
+    if (item.savedHackathonId) {
+      hack = await hacks.getHackathon(req.userId, item.savedHackathonId);
+    }
+    if (!hack) {
+      hack = await hacks.createHackathon(req.userId, {
+        title: item.title,
+        link: item.link,
+        source: item.platform,
+        startDate: item.startDate || null,
+        endDate: item.endDate || null,
+        mode: item.mode || 'online',
+        prize: item.prize || '',
+        description: item.summary || '',
+        rules: [],
+        participating: false,
+        tracking: true,
+      });
+      await docRef.set({ savedHackathonId: hack.id, status: 'saved', savedAt: Date.now() }, { merge: true });
+    }
+
+    const sessionId = await hacks.ensureChatSession(req.userId, hack);
+    await docRef.set({ chatSessionId: sessionId }, { merge: true });
+
+    // Seed any prior discussion messages from the card if session is brand new
+    const stored = (item.discussion && item.discussion.messages) || [];
+    if (stored.length) {
+      const memory = require('../services/memoryService');
+      const recent = await memory.getRecentMessages(req.userId, sessionId, 5);
+      if (!recent || recent.length === 0) {
+        for (const m of stored) {
+          await memory.addMessage(req.userId, sessionId, m.role, m.content);
+        }
+      }
+    }
+
+    res.json({ sessionId, hackathonId: hack.id });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

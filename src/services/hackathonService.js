@@ -447,21 +447,32 @@ Extract: title, startDate (timestamp ms or null), endDate (timestamp ms or null)
 
 // ── Per-hackathon chat session (context-isolated) ────────
 async function ensureChatSession(userId, hack) {
-  if (hack.chatSessionId) return hack.chatSessionId;
+  if (hack.chatSessionId) {
+    // Verify session still exists
+    try {
+      const snap = await require('../config/firebase').db.collection('users').doc(userId).collection('sessions').doc(hack.chatSessionId).get();
+      if (snap.exists) return hack.chatSessionId;
+    } catch (_) {}
+  }
 
-  // Try to find an existing session with matching title before creating a new one
+  // Try to find an existing session linked to this hackathon or matching title
   try {
     const sessions = await memory.listSessions(userId);
     const expectedTitle = `🏆 ${hack.title}`;
-    const match = sessions.find(s => s.title === expectedTitle);
+    const match = sessions.find(s => s.hackathonId === hack.id || s.title === expectedTitle);
     if (match) {
       await coll(userId).doc(hack.id).set({ chatSessionId: match.id }, { merge: true });
-      console.log(`ensureChatSession: re-linked existing session ${match.id} for hack="${hack.title}"`);
       return match.id;
     }
   } catch (e) { /* best-effort */ }
 
-  const s = await memory.createSession(userId, `🏆 ${hack.title}`, 'hackathon');
+  const s = await memory.createSession(userId, `🏆 ${hack.title}`, 'hackathon', {
+    hackathonId: hack.id,
+    source: hack.source || '',
+    link: hack.link || '',
+    prize: hack.prize || '',
+    customTitle: true,
+  });
   await coll(userId).doc(hack.id).set({ chatSessionId: s.id }, { merge: true });
   return s.id;
 }

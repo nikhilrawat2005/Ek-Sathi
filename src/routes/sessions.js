@@ -16,7 +16,7 @@ router.get('/', requireAuth, async (req, res) => {
   }
 });
 
-// POST /api/sessions  { title? }
+// POST /api/sessions  { title?, type?, meta? }
 router.post('/', requireAuth, async (req, res) => {
   try {
     if (req.isGuest) {
@@ -34,7 +34,9 @@ router.post('/', requireAuth, async (req, res) => {
     if (title && (typeof title !== 'string' || title.length > 100)) {
       return res.status(400).json({ error: 'title must be a string under 100 characters' });
     }
-    const session = await memory.createSession(req.userId, title);
+    const type = req.body.type || 'chat';
+    const meta = (req.body.meta && typeof req.body.meta === 'object') ? req.body.meta : {};
+    const session = await memory.createSession(req.userId, title, type, meta);
     res.json({ session });
   } catch (err) {
     res.status(500).json({ error: err.message });

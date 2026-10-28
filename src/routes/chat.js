@@ -511,15 +511,19 @@ router.post('/', requireAuth, async (req, res) => {
       behaviorEngine.updateBehaviorProfile(req.userId, promptMessage).catch(err => console.error(err));
     }
 
-    // Fetch session title for page-linked memory
+    // Fetch session title and metadata for page-linked memory & hackathon awareness
     let sessionTitle = 'Main Chat';
     let isCustomUserTitle = false;
+    let sessionType = 'chat';
+    let sessionHackathonId = null;
     if (!isGuestSession) {
       const sessionSnap = await require('../config/firebase').db.collection('users').doc(req.userId).collection('sessions').doc(sessionId).get().catch(() => null);
       if (sessionSnap && sessionSnap.exists) {
         const sdata = sessionSnap.data() || {};
         sessionTitle = sdata.title || 'Main Chat';
         isCustomUserTitle = sdata.customTitle === true;
+        sessionType = sdata.type || 'chat';
+        sessionHackathonId = sdata.hackathonId || null;
       }
     }
 
@@ -611,9 +615,45 @@ router.post('/', requireAuth, async (req, res) => {
     }
 
 
+    // Dedicated Hackathon Session Context injection:
+    if (sessionType === 'hackathon' || sessionHackathonId) {
+      try {
+        const hackathonService = require('../services/hackathonService');
+        let hackRecord = null;
+        if (sessionHackathonId) {
+          hackRecord = await hackathonService.getHackathon(req.userId, sessionHackathonId);
+        }
+        if (!hackRecord) {
+          const allHacks = await hackathonService.listHackathons(req.userId).catch(() => []);
+          hackRecord = allHacks.find(h => h.chatSessionId === sessionId || sessionTitle.includes(h.title));
+        }
+        if (hackRecord) {
+          const k = hackRecord.knowledge || {};
+          const lines = [
+            `🏆 DEDICATED HACKATHON CONTEXT FOR THIS CHAT:`,
+            `Title: ${hackRecord.title}`,
+            `Source/Platform: ${hackRecord.source || '—'}`,
+            `Link: ${hackRecord.link || '—'}`,
+            `Prize: ${hackRecord.prize || '—'}`,
+            `Mode: ${hackRecord.mode || '—'}`,
+            `Status: ${hackRecord.status || 'active'}`,
+            k.summary ? `Summary: ${k.summary}` : (hackRecord.description ? `Description: ${hackRecord.description}` : ''),
+            k.rules && k.rules.length ? `Rules/Guidelines:\n${k.rules.map(r => '  - ' + r).join('\n')}` : '',
+            k.eligibility ? `Eligibility: ${k.eligibility}` : '',
+            k.teamSize ? `Team size: ${k.teamSize}` : '',
+            hackRecord.startDate ? `Start: ${new Date(hackRecord.startDate).toLocaleDateString('en-IN')}` : '',
+            hackRecord.endDate ? `End: ${new Date(hackRecord.endDate).toLocaleDateString('en-IN')}` : '',
+          ].filter(Boolean).join('\n');
+          contextBlocks.push(lines);
+        }
+      } catch (hErr) {
+        console.warn('[Chat] Failed to inject dedicated hackathon context:', hErr.message);
+      }
+    }
+
     // Entity Workspace on-demand injection (Only when user explicitly asks/mentions)
     const mentionsHackathons = /\b(hackathon|hackathons|devpost|unstop|participant|participating|submission|prize pool)\b/i.test(promptMessage);
-    if (mentionsHackathons) {
+    if (mentionsHackathons && sessionType !== 'hackathon') {
       const hacks = await require('../services/hackathonService').listHackathons(req.userId).catch(() => []);
       if (hacks && hacks.length) {
         contextBlocks.push(`🏆 HACKATHON WORKSPACE (the user's active hackathons):\n${hacks.map(h => `- ${h.title} [${h.status}${h.participating ? ', participating ✓' : ''}]${h.endDate ? ` ends ${new Date(h.endDate).toLocaleDateString('en-IN')}` : ''}`).join('\n')}`);
@@ -825,10 +865,10 @@ Auto-extracted media data is provided in context below. Read full transcript/cap
       }
     }
 
-    // 8. Smart Chat Naming: If session title is default or new (and not manually customized by the user), generate a 3-5 word descriptive title
+    // 8. Smart Chat Naming: If session title is default or new (and not manually customized by the user and not a dedicated hackathon session), generate a 3-5 word descriptive title
     let updatedTitle = null;
     const isDefaultTitle = !sessionTitle || /^New Chat\b|^Main Chat$/i.test(sessionTitle.trim()) || sessionTitle.trim().length === 0;
-    if (!isCustomUserTitle && (isDefaultTitle || recent.length <= 4)) {
+    if (!isCustomUserTitle && sessionType !== 'hackathon' && (isDefaultTitle || recent.length <= 4)) {
       try {
         // Collect past few messages to give rich conversational context for title generation
         const contextSnippet = (recent && recent.length)

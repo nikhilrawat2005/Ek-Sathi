@@ -897,14 +897,23 @@ async function saveDiscovery(userId, discoveryId, participating = false) {
     tracking: true,
   });
 
+  // Automatically ensure a dedicated chat session is created and linked
+  let chatSessionId = null;
+  try {
+    chatSessionId = await hackathonService.ensureChatSession(userId, hack);
+  } catch (err) {
+    console.warn('[HackDiscovery] ensureChatSession error on save:', err.message);
+  }
+
   // Mark discovery as saved
   await docRef.set({
     status: 'saved',
     savedHackathonId: hack.id,
+    chatSessionId: chatSessionId || null,
     savedAt: Date.now(),
   }, { merge: true });
 
-  return hack;
+  return { ...hack, chatSessionId };
 }
 
 // ── Dismiss Discovery ─────────────────────────────────────
@@ -970,6 +979,31 @@ async function toggleDiscovery(userId, enable) {
   await setMeta(userId, { enabled: Boolean(enable) });
   console.log(`[HackDiscovery] Discovery ${enable ? 'ENABLED' : 'PAUSED'} for user ${userId}`);
   return { enabled: Boolean(enable) };
+}
+
+// ── Unsave Discovery (remove from Saved, restore to new) ──
+async function unsaveDiscovery(userId, discoveryId) {
+  const docRef = discoveryColl(userId).doc(discoveryId);
+  const snap = await docRef.get();
+  if (!snap.exists) throw new Error('Discovery card not found');
+  const item = snap.data();
+
+  // If there's an associated hackathon entry, remove it
+  if (item.savedHackathonId) {
+    try {
+      await hackathonService.deleteHackathon(userId, item.savedHackathonId);
+    } catch (_) {}
+  }
+
+  // Restore to new status so it's not permanently lost
+  await docRef.set({
+    status: 'new',
+    savedHackathonId: null,
+    chatSessionId: null,
+    savedAt: null,
+  }, { merge: true });
+
+  return { success: true, id: discoveryId };
 }
 
 // ── Saved list (Discover → Saved section) ──────────────────
@@ -1081,6 +1115,7 @@ module.exports = {
   listDiscovery,
   listSavedDiscovery,
   saveDiscovery,
+  unsaveDiscovery,
   dismissDiscovery,
   autoExpireDiscovery,
   getDiscoveryMeta,

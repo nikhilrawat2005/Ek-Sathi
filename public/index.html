@@ -185,8 +185,20 @@
               <div class="cards-hub-body">
                 <div class="cards-hub-badge">Builder Lab</div>
                 <h3 class="cards-hub-title">Hackathon Lab</h3>
-                <p class="cards-hub-desc">Curated hackathons across Devpost, Unstop &amp; Devfolio. Idea generator, project roadmaps, and pitch deck guides.</p>
-                <div class="cards-hub-cta">Explore Hackathons &rarr;</div>
+                <p class="cards-hub-desc">Saved hackathons &amp; internships repository. Track deadlines, review rules, and open dedicated interactive AI discussion chats.</p>
+                <div class="cards-hub-cta">Open Hackathon Lab &rarr;</div>
+              </div>
+            </div>
+
+            <div class="cards-hub-card" data-view-target="opportunities">
+              <div class="cards-hub-icon-wrap" style="--hub-accent:#0ea5e9;--hub-bg:rgba(14,165,233,0.08)">
+                <svg class="ic"><use href="#i-search" /></svg>
+              </div>
+              <div class="cards-hub-body">
+                <div class="cards-hub-badge">Live Radar</div>
+                <h3 class="cards-hub-title">Opportunity Finder</h3>
+                <p class="cards-hub-desc">Live radar across Devpost, Unstop, Devfolio &amp; Internshala. Filter top hackathons &amp; internships, discuss on the fly, and save directly to your Lab.</p>
+                <div class="cards-hub-cta">Scan Opportunities &rarr;</div>
               </div>
             </div>
 
@@ -211,18 +223,6 @@
                 <h3 class="cards-hub-title">GitHub &amp; Website Study</h3>
                 <p class="cards-hub-desc">Decode any GitHub repository architecture, analyze web structures, and run interactive Q&amp;A sessions on codebases.</p>
                 <div class="cards-hub-cta">Start Study &rarr;</div>
-              </div>
-            </div>
-
-            <div class="cards-hub-card" data-view-target="opportunities">
-              <div class="cards-hub-icon-wrap" style="--hub-accent:#0ea5e9;--hub-bg:rgba(14,165,233,0.08)">
-                <svg class="ic"><use href="#i-search" /></svg>
-              </div>
-              <div class="cards-hub-body">
-                <div class="cards-hub-badge">Job Board</div>
-                <h3 class="cards-hub-title">Opportunity Finder</h3>
-                <p class="cards-hub-desc">Direct internships &amp; software developer openings filtered for college students across LinkedIn, Internshala and portals.</p>
-                <div class="cards-hub-cta">Find Internships &rarr;</div>
               </div>
             </div>
 
@@ -275,42 +275,25 @@
             </button>
             <div>
               <div class="view-title">Hackathon Lab</div>
-              <div class="view-sub">Real hackathons &amp; internships scraped live — IT sector</div>
+              <div class="view-sub">Your saved hackathons &amp; internships — track deadlines, guidelines, and launch full AI chat sessions.</div>
             </div>
           </div>
           <div class="view-header-actions">
-            <span class="scan-status" id="scan-status"></span>
-            <button class="btn-small" id="hack-scan-btn" title="Scrape now">
+            <button class="btn-small" id="saved-refresh-btn" title="Refresh saved">
               <svg class="ic" style="width:14px;height:14px"><use href="#i-refresh" /></svg>
-              <span>Scan Now</span>
+              <span>Refresh</span>
             </button>
           </div>
         </div>
         <div class="discover-toolbar">
-          <input class="study-input search-input" id="discover-filter" placeholder="Filter by title, prize, tags, source..." />
-          <select class="model-select" id="discover-source-filter">
-            <option value="">All sources</option>
-            <option value="devpost">Devpost</option>
-            <option value="unstop">Unstop</option>
-            <option value="devfolio">Devfolio</option>
-            <option value="hackerearth">HackerEarth</option>
-            <option value="mlh">MLH</option>
-            <option value="internshala">Internshala</option>
-          </select>
-          <select class="model-select" id="discover-type-filter">
-            <option value="">All</option>
+          <input class="study-input search-input" id="saved-filter" placeholder="Filter saved hackathons by title, tag, prize..." />
+          <select class="model-select" id="saved-type-filter">
+            <option value="">All Saved</option>
             <option value="hackathon">Hackathons</option>
             <option value="internship">Internships</option>
           </select>
         </div>
-        <div class="hack-tabs">
-          <button class="hack-tab active" id="tab-discover"><svg class="ic"><use href="#i-search" /></svg><span>Discover</span></button>
-          <button class="hack-tab" id="tab-saved"><svg class="ic"><use href="#i-bookmark" /></svg><span>Saved</span></button>
-        </div>
-        <div class="hack-workspace" id="panel-discover" style="flex:1;min-height:0;">
-          <div class="discover-grid" id="discover-grid"></div>
-        </div>
-        <div class="hack-workspace" id="panel-saved" style="flex:1;min-height:0;display:none;">
+        <div class="hack-workspace" id="panel-saved" style="flex:1;min-height:0;display:flex;">
           <div class="discover-grid" id="saved-grid"></div>
         </div>
       </section>
@@ -410,20 +393,36 @@
             </button>
             <div>
               <div class="view-title">Opportunity Finder</div>
-              <div class="view-sub">Discover internships, hackathons &amp; opportunities — curated for CSE students.</div>
+              <div class="view-sub">Live Radar: Scraped hackathons &amp; internships across Devpost, Unstop, Devfolio &amp; Internshala.</div>
             </div>
           </div>
+          <div class="view-header-actions">
+            <span class="scan-status" id="scan-status"></span>
+            <button class="btn-small" id="hack-scan-btn" title="Scan live platforms now">
+              <svg class="ic" style="width:14px;height:14px"><use href="#i-refresh" /></svg>
+              <span>Scan Radar</span>
+            </button>
+          </div>
         </div>
-        <div class="opp-toolbar" id="opp-toolbar">
-          <button class="btn-small opp-filter active" data-type="all">All</button>
-          <button class="btn-small opp-filter" data-type="internship">Internships</button>
-          <button class="btn-small opp-filter" data-type="hackathon">Hackathons</button>
-          <button class="btn-small" id="opp-refresh-btn" style="margin-left:auto">
-            <svg class="ic"><use href="#i-refresh" /></svg> Refresh
-          </button>
+        <div class="discover-toolbar">
+          <input class="study-input search-input" id="discover-filter" placeholder="Filter opportunities by title, tech stack, prize, company..." />
+          <select class="model-select" id="discover-source-filter">
+            <option value="">All sources</option>
+            <option value="devpost">Devpost</option>
+            <option value="unstop">Unstop</option>
+            <option value="devfolio">Devfolio</option>
+            <option value="hackerearth">HackerEarth</option>
+            <option value="mlh">MLH</option>
+            <option value="internshala">Internshala</option>
+          </select>
+          <select class="model-select" id="discover-type-filter">
+            <option value="">All Types</option>
+            <option value="hackathon">Hackathons</option>
+            <option value="internship">Internships</option>
+          </select>
         </div>
-        <div class="opp-grid" id="opp-grid">
-          <div class="study-placeholder">Loading opportunities…</div>
+        <div class="hack-workspace" id="panel-discover" style="flex:1;min-height:0;display:flex;">
+          <div class="discover-grid" id="discover-grid"></div>
         </div>
       </section>
 

@@ -9,11 +9,12 @@ const { db, firebaseAdmin } = require('../config/firebase');
  * users/{userId}/monthlyFiles/{monthId}       -> { filename, content, mime, monthId, createdAt }
  */
 
-async function createSession(userId, title = 'New chat', type = 'chat') {
+async function createSession(userId, title = 'New chat', type = 'chat', meta = {}) {
   const ref = db.collection('users').doc(userId).collection('sessions').doc();
   const now = Date.now();
-  await ref.set({ title, type, createdAt: now, updatedAt: now });
-  return { id: ref.id, title, type, createdAt: now, updatedAt: now };
+  const data = { title, type, createdAt: now, updatedAt: now, ...meta };
+  await ref.set(data);
+  return { id: ref.id, ...data };
 }
 
 async function updateSessionTitle(userId, sessionId, title) {

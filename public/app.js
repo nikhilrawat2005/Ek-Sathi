@@ -284,8 +284,8 @@ function showView(view) {
 
   document.querySelectorAll('.view').forEach((v) => v.classList.toggle('active', v.id === `view-${view}`));
   document.querySelectorAll('.nav-btn').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
-  if (view === 'hackathon') loadDiscoverCards();
-  if (view === 'opportunities') loadOpportunities();
+  if (view === 'hackathon') loadSavedCards();
+  if (view === 'opportunities') loadDiscoverCards();
   if (view === 'news') loadNews();
   if (view === 'system-status') loadSystemStatus();
   if (view === 'memory-hub') loadMemoryHub();
@@ -317,17 +317,46 @@ function renderSessions() {
     list.innerHTML = '<div class="sessions-empty">No chats yet</div>';
     return;
   }
-  list.innerHTML = sessions.map((s) => `
-    <div class="session-item ${s.id === currentSessionId ? 'active' : ''}" data-id="${escHtml(s.id)}">
-      <div class="session-title" title="${escHtml(s.title || 'Untitled')}">${escHtml(s.title || 'Untitled')}</div>
+
+  const hackSessions = sessions.filter(s => s.type === 'hackathon');
+  const regularSessions = sessions.filter(s => s.type !== 'hackathon');
+
+  const renderItemHtml = (s) => `
+    <div class="session-item ${s.id === currentSessionId ? 'active' : ''} ${s.type === 'hackathon' ? 'session-hackathon' : ''}" data-id="${escHtml(s.id)}">
+      <div class="session-title" title="${escHtml(s.title || 'Untitled')}">
+        ${s.type === 'hackathon' ? '<span class="session-type-icon" title="Saved Hackathon Chat"><svg class="ic" style="width:12px;height:12px;vertical-align:-1px;margin-right:3px;color:#d97706"><use href="#i-trophy" /></svg></span>' : ''}${escHtml(s.title || 'Untitled')}
+      </div>
       <div class="session-item-actions">
         <button class="btn-edit-session" title="Rename chat" data-edit="${escHtml(s.id)}" data-title="${escHtml(s.title || '')}"><svg class="ic" style="width:12px;height:12px"><use href="#i-edit" /></svg></button>
         <button class="btn-delete-session" title="Delete chat" data-del="${escHtml(s.id)}"><svg class="ic" style="width:13px;height:13px"><use href="#i-trash" /></svg></button>
       </div>
-    </div>`).join('');
+    </div>`;
+
+  let html = '';
+  if (hackSessions.length) {
+    html += `<div class="sidebar-subgroup-title">
+      <span><svg class="ic" style="width:11px;height:11px;vertical-align:-1px;margin-right:3px;color:#d97706"><use href="#i-trophy" /></svg>Saved Hackathons</span>
+      <span class="subgroup-count">${hackSessions.length}</span>
+    </div>`;
+    html += hackSessions.map(renderItemHtml).join('');
+  }
+
+  if (regularSessions.length) {
+    if (hackSessions.length) {
+      html += `<div class="sidebar-subgroup-title" style="margin-top:8px">
+        <span>Chats</span>
+        <span class="subgroup-count">${regularSessions.length}</span>
+      </div>`;
+    }
+    html += regularSessions.map(renderItemHtml).join('');
+  }
+
+  list.innerHTML = html;
+
   list.querySelectorAll('.session-item').forEach((el) => {
     el.addEventListener('click', (e) => {
       if (e.target.closest('.btn-delete-session') || e.target.closest('.btn-edit-session')) return;
+      showView('chat');
       switchSession(el.dataset.id);
     });
   });
@@ -668,23 +697,64 @@ async function loadSavedCards() {
   }
 }
 
-function renderSavedGrid() {
-  const grid = $('saved-grid');
-  if (!savedCards.length) {
-    grid.innerHTML = `<div class="d-card-empty">Nothing saved yet — open Discover and press Save on any card to keep its discussion memory here.</div>`;
+async function openDedicatedHackathonChat(cardOrId) {
+  let card = typeof cardOrId === 'string' ? savedCards.find((x) => x.id === cardOrId) : cardOrId;
+  const cardId = typeof cardOrId === 'string' ? cardOrId : (card && card.id);
+  if (!cardId) return;
+
+  if (!isUserSignedIn()) {
+    openAuthModal('login');
     return;
   }
-  grid.innerHTML = savedCards.map((c) => {
+
+  try {
+    const res = await apiFetch(`/api/hackathons/discover/${cardId}/session`, { method: 'POST' });
+    if (res && res.sessionId) {
+      await loadSessions();
+      showView('chat');
+      await switchSession(res.sessionId);
+    } else {
+      throw new Error('Could not establish chat session');
+    }
+  } catch (err) {
+    alert('Failed to open chat: ' + err.message);
+  }
+}
+
+function filteredSavedCards() {
+  const q = ($('saved-filter')?.value || '').trim().toLowerCase();
+  const type = $('saved-type-filter')?.value || '';
+  return savedCards.filter((c) => {
+    if (type && (c.type || 'hackathon') !== type) return false;
+    if (!q) return true;
+    const hay = `${c.title || ''} ${c.summary || ''} ${c.prize || ''} ${(c.tags || []).join(' ')} ${c.platform || ''} ${c.company || ''}`.toLowerCase();
+    return hay.includes(q);
+  });
+}
+
+function renderSavedGrid() {
+  const grid = $('saved-grid');
+  if (!grid) return;
+  const list = filteredSavedCards();
+  if (!list.length) {
+    const isFiltered = ($('saved-filter')?.value || '') || ($('saved-type-filter')?.value || '');
+    grid.innerHTML = `<div class="d-card-empty">${isFiltered ? 'No saved opportunities match your filter.' : 'Nothing saved yet — open Opportunity Finder to scan live hackathons and internships, then press Save on any card to manage them here.'}</div>`;
+    return;
+  }
+  grid.innerHTML = list.map((c) => {
     const isIntern = (c.type || 'hackathon') === 'internship';
     const badge = isIntern ? 'INTERNSHIP' : 'HACKATHON';
+    const dateLabel = cardDateLabel(c);
     const metaBits = [
       c.mode ? c.mode : '',
       c.location ? c.location : '',
-      isIntern ? (c.stipend ? `, stipend ${c.stipend}` : '') : (c.fee ? `, ${c.fee}` : ''),
-      isIntern && c.duration ? `, ${c.duration}` : '',
-    ].join(' | ').replace(/^\s*\|\s*/, '');
+      isIntern ? (c.stipend ? `stipend ${c.stipend}` : '') : (c.fee ? `${c.fee}` : ''),
+      isIntern && c.duration ? `${c.duration}` : '',
+      !isIntern && c.seatsStatus ? `${c.seatsStatus}` : '',
+    ].filter(Boolean).join(' | ');
+
     return `
-      <div class="d-card" data-id="${escHtml(c.id)}">
+      <div class="d-card ${isIntern ? 'intern' : 'hack'}" data-id="${escHtml(c.id)}">
         <div class="d-card-head">
           <div>
             <div class="d-card-title">${escHtml(c.title || 'Untitled')}</div>
@@ -692,24 +762,48 @@ function renderSavedGrid() {
           </div>
         </div>
         <div class="d-card-body">
+          ${dateLabel ? `<div class="d-card-date-badge"><svg class="ic" style="width:13px;height:13px"><use href="#i-refresh" /></svg><span>${escHtml(dateLabel)}</span></div>` : ''}
           ${c.summary ? `<p>${escHtml(c.summary)}</p>` : ''}
+          ${c.whatToBuild ? `<p><strong>What to build:</strong> ${escHtml(c.whatToBuild)}</p>` : ''}
           ${c.prize ? `<p><span class="d-prize">${escHtml(c.prize)}</span></p>` : ''}
-          ${isIntern && c.company ? `<p>${escHtml(c.company)}</p>` : ''}
+          ${isIntern && c.company ? `<p><strong>Company:</strong> ${escHtml(c.company)}</p>` : ''}
           ${metaBits ? `<p>${escHtml(metaBits)}</p>` : ''}
         </div>
         ${(c.tags && c.tags.length) ? `<div class="d-card-meta">${c.tags.slice(0, 6).map((t) => `<span class="d-card-tag">${escHtml(t)}</span>`).join('')}</div>` : ''}
         <div class="d-card-foot">
           ${c.link ? `<a class="d-link" href="${escHtml(c.link)}" target="_blank" rel="noopener">View details ↗</a>` : ''}
           <div class="d-card-actions">
-            <button class="btn-ghost" data-discuss="${escHtml(c.id)}">Discuss${c.discussionCount ? ` · ${c.discussionCount}m` : ''}</button>
+            <button class="btn-primary" style="padding:6px 12px;font-size:12px;border-radius:6px;gap:5px" data-open-chat="${escHtml(c.id)}" title="Open dedicated chat session with all features">
+              <svg class="ic" style="width:13px;height:13px"><use href="#i-chat" /></svg>
+              <span>Chat / Discuss</span>
+            </button>
+            <button class="btn-ghost" data-discuss="${escHtml(c.id)}" title="Quick preview overlay">Quick View</button>
+            <button class="btn-ghost-red" data-unsave="${escHtml(c.id)}" title="Remove from saved">Unsave</button>
           </div>
         </div>
       </div>`;
   }).join('');
 
+  grid.querySelectorAll('[data-open-chat]').forEach((b) => b.addEventListener('click', () => {
+    openDedicatedHackathonChat(b.dataset.openChat);
+  }));
+
   grid.querySelectorAll('[data-discuss]').forEach((b) => b.addEventListener('click', () => {
     const card = savedCards.find((x) => x.id === b.dataset.discuss);
     if (card) openContextChat(subjectFromCard(card), CC_SUGGEST[card.type || 'hackathon'] || CC_SUGGEST.hackathon);
+  }));
+
+  grid.querySelectorAll('[data-unsave]').forEach((b) => b.addEventListener('click', async () => {
+    if (b.disabled) return;
+    b.disabled = true;
+    const id = b.dataset.unsave;
+    try {
+      await apiFetch(`/api/hackathons/discover/${id}/unsave`, { method: 'POST' });
+      await loadSavedCards();
+      await loadDiscoverCards();
+      await loadSessions();
+    } catch (err) { alert('Unsave failed: ' + err.message); }
+    finally { b.disabled = false; }
   }));
 }
 
@@ -852,6 +946,7 @@ function renderDiscoverGrid() {
       }
       await loadDiscoverCards();
       await loadSavedCards();
+      await loadSessions();
     } catch (err) { alert('Save failed: ' + err.message); }
     finally { b.disabled = false; }
   }));
@@ -1817,26 +1912,23 @@ function bindStudy() {
   });
 }
 
-/* ── Discovery bind ────────────────────────────────────── */
+/* ── Discovery & Saved Binds ───────────────────────────── */
 function bindDiscovery() {
-  $('hack-scan-btn').addEventListener('click', scanNow);
-  $('discover-filter').addEventListener('input', renderDiscoverGrid);
-  $('discover-source-filter').addEventListener('change', renderDiscoverGrid);
-  $('discover-type-filter').addEventListener('change', renderDiscoverGrid);
-  const tabDiscover = $('tab-discover');
-  const tabSaved = $('tab-saved');
-  if (tabDiscover && tabSaved) {
-    const setTab = (which) => {
-      _savedActive = which === 'saved';
-      tabDiscover.classList.toggle('active', !_savedActive);
-      tabSaved.classList.toggle('active', _savedActive);
-      $('panel-discover').style.display = _savedActive ? 'none' : 'flex';
-      $('panel-saved').style.display = _savedActive ? 'flex' : 'none';
-      if (_savedActive) loadSavedCards(); else renderDiscoverGrid();
-    };
-    tabDiscover.addEventListener('click', () => setTab('discover'));
-    tabSaved.addEventListener('click', () => setTab('saved'));
-  }
+  const scanBtn = $('hack-scan-btn');
+  if (scanBtn) scanBtn.addEventListener('click', scanNow);
+  const discFilter = $('discover-filter');
+  if (discFilter) discFilter.addEventListener('input', renderDiscoverGrid);
+  const discSrc = $('discover-source-filter');
+  if (discSrc) discSrc.addEventListener('change', renderDiscoverGrid);
+  const discType = $('discover-type-filter');
+  if (discType) discType.addEventListener('change', renderDiscoverGrid);
+
+  const savedFilter = $('saved-filter');
+  if (savedFilter) savedFilter.addEventListener('input', renderSavedGrid);
+  const savedType = $('saved-type-filter');
+  if (savedType) savedType.addEventListener('change', renderSavedGrid);
+  const savedRefresh = $('saved-refresh-btn');
+  if (savedRefresh) savedRefresh.addEventListener('click', loadSavedCards);
 }
 
 /* ── Init ──────────────────────────────────────────────── */
